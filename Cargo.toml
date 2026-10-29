@@ -1,0 +1,12 @@
+[package]
+name = "poke_sim"
+version = "0.1.0"
+edition = "2024"
+description = "Determine winrate of all Pokemon Red Pokemon"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/T1nyTim/PokeSim"
+readme = "Codes right there"
+keywords = ["Simulation", "Pokemon", "Pokemon Red"]
+categories = ["simulation"]
+
+[dependencies]
