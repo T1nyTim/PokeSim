@@ -248,6 +248,12 @@ impl Effect {
 
     pub(crate) fn duration_end_probability(&self, turns_elapsed: u8) -> f64 {
         let max_turns = match *self {
+            Self::Confusion => {
+                if turns_elapsed == 0 {
+                    return 0.0;
+                }
+                5
+            }
             Self::Disable => 8,
             Self::Sleep => 7,
             Self::Trapping => {
@@ -266,7 +272,6 @@ impl Effect {
             | Self::Bide
             | Self::BurnSide1
             | Self::Charge
-            | Self::Confusion
             | Self::ConfusionSide
             | Self::DefenseDown1
             | Self::DefenseDown2
@@ -298,7 +303,7 @@ impl Effect {
             | Self::SwitchAndTeleport
             | Self::ThrashPetalDance
             | Self::Twineedle
-            | Self::TwoToFiveAttacks => unreachable!("Only Disable, Sleep and trapping moves defer their durations"),
+            | Self::TwoToFiveAttacks => unreachable!("Only Confusion, Disable, Sleep and trapping moves defer their durations"),
         };
         1.0 / f64::from(max_turns - turns_elapsed)
     }
@@ -307,6 +312,7 @@ impl Effect {
         match *self {
             Self::Bide | Self::DefenseUp1 => 1.0,
             Self::NoEffect
+            | Self::Confusion
             | Self::DefenseDownSide
             | Self::Disable
             | Self::DrainHp
@@ -325,7 +331,6 @@ impl Effect {
             Self::AttackTwice
             | Self::BurnSide1
             | Self::Charge
-            | Self::Confusion
             | Self::ConfusionSide
             | Self::EvasionUp
             | Self::Explode

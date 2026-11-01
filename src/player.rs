@@ -1,6 +1,6 @@
 use crate::{
-    data::BaseStats,
-    matchup::MatchupKind,
+    data::{BaseStats, Item},
+    journey::MatchupKind,
     pokemon::{Pokemon, Stats},
 };
 
@@ -38,15 +38,24 @@ impl Player {
         let growth = &self.active.species.growth;
         self.xp = (self.xp + xp).min(growth.experience_at(100));
         while self.active.level < 100 && self.xp >= growth.experience_at(self.active.level + 1) {
-            self.active.level += 1;
+            self.active.level_up();
             self.leveled_up = true;
-            println!("Level up: Lv. {}", self.active.level);
-            self.active.learn_level_up_moves();
         }
     }
 
     pub(super) fn stats(&self) -> Stats {
         Stats::from_base_stats(self.active.base_stats(), &self.active.dvs, self.active.level, &self.stat_exp)
+    }
+
+    pub(super) fn use_item(&mut self, item: &Item) -> bool {
+        let used = match item {
+            Item::HpUp => self.stat_exp.use_hp_up(),
+            Item::MoonStone => todo!(),
+        };
+        if used {
+            println!("Used: {}", item.name());
+        }
+        used
     }
 }
 
@@ -60,6 +69,14 @@ pub struct StatExp {
 }
 
 impl StatExp {
+    const fn use_hp_up(&mut self) -> bool {
+        if self.hp >= 25_600 {
+            return false;
+        }
+        self.hp += 2_560;
+        true
+    }
+
     fn gain(&mut self, base: &BaseStats) {
         self.hp = self.hp.saturating_add(u16::from(base.hp));
         self.atk = self.atk.saturating_add(u16::from(base.atk));

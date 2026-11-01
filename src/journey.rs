@@ -1,7 +1,7 @@
 use core::array;
 
 use crate::{
-    data::{Move, moves::STRUGGLE},
+    data::{Item, Move, moves::STRUGGLE},
     pokemon::Pokemon,
 };
 
@@ -11,7 +11,7 @@ pub const BUG_CATCHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const JR_TRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const LASS: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const RIVAL1: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const ROCKET: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const ROCKET: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const SUPER_NERD: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
 pub const YOUNGSTER: &[AiPolicy] = &[];
 
@@ -28,6 +28,11 @@ impl AiPolicy {
             Self::DecreaseStatusCondition => 0,
         }
     }
+}
+
+pub enum JourneyStep {
+    Matchup(MatchupGroup),
+    Item(Item),
 }
 
 pub enum MatchupKind {

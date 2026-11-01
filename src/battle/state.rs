@@ -26,6 +26,7 @@ pub struct CombatantState {
     pub hp: u16,
     pub stages: StatStages,
     bide: Option<BideState>,
+    confusion_elapsed: Option<u8>,
     disabled: Option<DisableState>,
     poisoned: bool,
     seeded: bool,
@@ -42,14 +43,6 @@ impl CombatantState {
         self.hp > 0 && !self.has_status_condition() && !types.contains(&Type::Poison)
     }
 
-    pub(super) fn advance_sleep(&mut self) -> Option<f64> {
-        #[expect(clippy::question_mark_used, reason = "handled before end of function")]
-        let turns_elapsed = self.sleep_elapsed.as_mut()?;
-        let probability = Effect::Sleep.duration_end_probability(*turns_elapsed);
-        *turns_elapsed += 1;
-        Some(probability)
-    }
-
     pub(super) const fn can_be_disabled(&self) -> bool {
         self.hp > 0 && self.disabled.is_none()
     }
@@ -58,8 +51,18 @@ impl CombatantState {
         self.hp > 0 && !self.has_status_condition()
     }
 
+    pub(super) const fn confuse(&mut self) {
+        if self.hp > 0 && self.confusion_elapsed.is_none() {
+            self.confusion_elapsed = Some(0);
+        }
+    }
+
     pub(super) const fn disable(&mut self, disabled: DisableState) {
         self.disabled = Some(disabled);
+    }
+
+    pub(super) const fn end_confusion(&mut self) {
+        self.confusion_elapsed = None;
     }
 
     pub(super) const fn end_disable(&mut self) {
@@ -86,8 +89,24 @@ impl CombatantState {
         self.sleep_elapsed = None;
     }
 
+    pub(super) fn advance_confusion(&mut self) -> Option<f64> {
+        #[expect(clippy::question_mark_used, reason = "handled before end of function")]
+        let turns_elapsed = self.confusion_elapsed.as_mut()?;
+        let probability = Effect::Confusion.duration_end_probability(*turns_elapsed);
+        *turns_elapsed += 1;
+        Some(probability)
+    }
+
     pub(super) fn advance_disable(&mut self) -> Option<f64> {
         self.disabled.as_mut().map(DisableState::advance)
+    }
+
+    pub(super) fn advance_sleep(&mut self) -> Option<f64> {
+        #[expect(clippy::question_mark_used, reason = "handled before end of function")]
+        let turns_elapsed = self.sleep_elapsed.as_mut()?;
+        let probability = Effect::Sleep.duration_end_probability(*turns_elapsed);
+        *turns_elapsed += 1;
+        Some(probability)
     }
 
     pub(super) fn can_be_seeded(&self, types: &[Type; 2]) -> bool {
@@ -142,11 +161,20 @@ impl CombatantState {
         }
     }
 
+    fn hurt_in_confusion(&mut self, damage: u16) -> u16 {
+        let dmg_dealt = damage.min(self.hp);
+        self.hp -= dmg_dealt;
+        self.bide = None;
+        self.trapping = None;
+        dmg_dealt
+    }
+
     fn new(hp: u16) -> Self {
         Self {
             hp,
             stages: StatStages::default(),
             bide: None,
+            confusion_elapsed: None,
             disabled: None,
             poisoned: false,
             seeded: false,
@@ -335,12 +363,54 @@ impl BattleState {
             (Side::Player, true) | (Side::Ai, false) => &mut self.player,
             (Side::Ai, true) | (Side::Player, false) => &mut self.ai,
         };
-        if matches!(effect, Effect::LeechSeed) {
-            if target.can_be_seeded(target_types) {
-                target.seeded = true;
+        match effect {
+            Effect::Confusion => target.confuse(),
+            Effect::LeechSeed => {
+                if target.can_be_seeded(target_types) {
+                    target.seeded = true;
+                }
             }
-        } else {
-            effect.apply_status(&mut target.stages);
+            Effect::NoEffect
+            | Effect::AccuracyDown
+            | Effect::AttackDown
+            | Effect::AttackTwice
+            | Effect::Bide
+            | Effect::BurnSide1
+            | Effect::Charge
+            | Effect::ConfusionSide
+            | Effect::DefenseDown1
+            | Effect::DefenseDown2
+            | Effect::DefenseDownSide
+            | Effect::DefenseUp1
+            | Effect::Disable
+            | Effect::DrainHp
+            | Effect::EvasionUp
+            | Effect::Explode
+            | Effect::Flinch1
+            | Effect::FocusEnergy
+            | Effect::Haze
+            | Effect::Heal
+            | Effect::LightScreen
+            | Effect::Metronome
+            | Effect::MirrorMove
+            | Effect::OHKO
+            | Effect::Paralyze
+            | Effect::ParalyzeSide2
+            | Effect::Poison
+            | Effect::PoisonSide1
+            | Effect::Rage
+            | Effect::Recoil
+            | Effect::Sleep
+            | Effect::SpecialUp1
+            | Effect::SpeedDown
+            | Effect::SpeedUp
+            | Effect::SuperFang
+            | Effect::Swift
+            | Effect::SwitchAndTeleport
+            | Effect::ThrashPetalDance
+            | Effect::Trapping
+            | Effect::Twineedle
+            | Effect::TwoToFiveAttacks => effect.apply_status(&mut target.stages),
         }
     }
 
@@ -386,6 +456,10 @@ impl BattleState {
     pub(super) fn finish_turn(&mut self) {
         self.player.finish_turn();
         self.ai.finish_turn();
+    }
+
+    pub(super) fn hurt_in_confusion(&mut self, side: Side, damage: u16) {
+        self.last_damage = self.combatant_mut(side).hurt_in_confusion(damage);
     }
 }
 

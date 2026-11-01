@@ -1,6 +1,6 @@
 use core::fmt::{self, Formatter};
 
-use crate::{battle::BattleOutcome, matchup::MatchupKind};
+use crate::{battle::BattleOutcome, journey::MatchupKind};
 
 #[derive(Default)]
 pub struct WinRates {

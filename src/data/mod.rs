@@ -8,13 +8,14 @@ use crate::data::{effects::Effect, moves::STRUGGLE};
 
 pub enum Evolve {
     Level(u8),
+    #[expect(dead_code, reason = "Will be used when other items are implemented")]
     Item(Item),
 }
 
 impl Evolve {
     const fn is_met(&self, level: u8) -> bool {
         match *self {
-            Self::Item(_) => todo!(),
+            Self::Item(_) => false,
             Self::Level(req) => level >= req,
         }
     }
@@ -38,8 +39,19 @@ impl GrowthRate {
     }
 }
 
+#[derive(Eq, PartialEq)]
 pub enum Item {
+    HpUp,
     MoonStone,
+}
+
+impl Item {
+    pub(super) const fn name(&self) -> &'static str {
+        match self {
+            Self::HpUp => "HP Up",
+            Self::MoonStone => "Moon Stone",
+        }
+    }
 }
 
 #[derive(Eq, Hash, PartialEq)]

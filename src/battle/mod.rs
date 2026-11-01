@@ -18,7 +18,7 @@ use crate::{
         effects::{Effect, EffectResolution},
         moves::{self, BIDE, STRUGGLE},
     },
-    matchup::{GameAi, PlayerPolicy},
+    journey::{GameAi, PlayerPolicy},
     player::Player,
     pokemon::{Pokemon, Stats},
 };
@@ -87,7 +87,7 @@ impl<'battle> Battle<'battle> {
                 if probability == 0.0f64 {
                     continue;
                 }
-                let player_move = if state.player.is_asleep() || state.is_trapped(Side::Player) {
+                let player_move = if state.player.is_asleep() {
                     None
                 } else if let Some(mv) = state.player.trapping_move() {
                     Some((None, mv))
@@ -101,7 +101,7 @@ impl<'battle> Battle<'battle> {
                             }),
                     )
                 };
-                let ai_action = if state.ai.is_asleep() || state.is_trapped(Side::Ai) {
+                let ai_action = if state.ai.is_asleep() {
                     TurnAction::Skip
                 } else if let Some(mv) = state.ai.trapping_move() {
                     TurnAction::Move(None, mv)
@@ -333,9 +333,37 @@ impl<'battle> Battle<'battle> {
         if let Some(expiry_prob) = branch.state.combatant_mut(side).advance_disable() {
             if expiry_prob < 1.0f64 {
                 let disabled = branch.clone();
-                self.begin_action(disabled, probability * (1.0 - expiry_prob));
+                self.resolve_confusion(disabled, probability * (1.0 - expiry_prob));
             }
             branch.state.combatant_mut(side).end_disable();
+            probability *= expiry_prob;
+        }
+        self.resolve_confusion(branch, probability);
+    }
+
+    fn resolve_confusion(&mut self, mut branch: Branch, mut probability: f64) {
+        if probability == 0.0f64 {
+            return;
+        }
+        let side = branch.turn.side.expect("Checking confusion requires an acting side");
+        if let Some(expiry_prob) = branch.state.combatant_mut(side).advance_confusion() {
+            if expiry_prob < 1.0f64 {
+                let continuing_prob = probability * (1.0f64 - expiry_prob) * 0.5f64;
+                let mut self_hit = branch.clone();
+                let combatant = match side {
+                    Side::Player => &self.player,
+                    Side::Ai => &self.ai,
+                };
+                let damage = combatant.confusion_damage(&self_hit.state.combatant(side).stages);
+                self_hit.state.hurt_in_confusion(side, damage);
+                self.finish_action(self_hit, continuing_prob);
+                if expiry_prob == 0.0f64 {
+                    self.begin_action(branch.clone(), continuing_prob);
+                    return;
+                }
+                self.begin_action(branch.clone(), continuing_prob);
+            }
+            branch.state.combatant_mut(side).end_confusion();
             probability *= expiry_prob;
         }
         self.begin_action(branch, probability);
@@ -440,8 +468,22 @@ impl<'battle> Combatant<'battle> {
         }
     }
 
+    fn base_damage(&self, power: u8, mut attack: u32, mut defense: u32, crit: bool) -> u32 {
+        if attack >= 256 || defense >= 256 {
+            attack = (attack / 4 % 256).max(1);
+            defense = defense / 4 % 256;
+        }
+        let level = u32::from(self.pokemon.level) * if crit { 2 } else { 1 };
+        let damage = ((2 * level / 5 + 2) * u32::from(power) * attack)
+            .checked_div(defense)
+            .expect("The game does not account for 0 defense and crashes")
+            / 50;
+        damage.min(997) + 2
+    }
+
     fn crit_probability(&self, mv: &Move) -> f64 {
         let mut threshold = u16::from(self.pokemon.base_stats().spd / 2);
+        // wrong place for this to be being managed
         if mv == &moves::RAZOR_LEAF || mv == &moves::SLASH {
             threshold = (threshold * 8).min(255);
         }
@@ -449,7 +491,7 @@ impl<'battle> Combatant<'battle> {
     }
 
     fn calculate_damage_rolls(&self, target: &Self, stages: &StatStages, target_stages: &StatStages, mv: &Move, crit: bool) -> Vec<(u16, f64)> {
-        let (mut attack, mut defense) = if mv.mv_type.is_special() {
+        let (attack, defense) = if mv.mv_type.is_special() {
             (u32::from(self.stats.spc), u32::from(target.stats.spc))
         } else if crit {
             (u32::from(self.stats.atk), u32::from(target.stats.def))
@@ -459,16 +501,7 @@ impl<'battle> Combatant<'battle> {
                 StatStages::apply(target.stats.def, target_stages.def),
             )
         };
-        if attack >= 256 || defense >= 256 {
-            attack = (attack / 4 % 256).max(1);
-            defense = defense / 4 % 256;
-        }
-        let level = u32::from(self.pokemon.level) * if crit { 2 } else { 1 };
-        let mut damage = ((2 * level / 5 + 2) * u32::from(mv.power) * attack)
-            .checked_div(defense)
-            .expect("The game does not account for 0 defense and crashes")
-            / 50;
-        damage = damage.min(997) + 2;
+        let mut damage = self.base_damage(mv.power, attack, defense, crit);
         if self.pokemon.species.types.contains(&mv.mv_type) {
             damage += damage / 2;
         }
@@ -492,6 +525,15 @@ impl<'battle> Combatant<'battle> {
             rolls.push((rolled_damage, 1u8));
         }
         rolls.into_iter().map(|(dmg, count)| (dmg, f64::from(count) / 39.0f64)).collect()
+    }
+
+    fn confusion_damage(&self, stages: &StatStages) -> u16 {
+        self.base_damage(
+            40,
+            StatStages::apply(self.stats.atk, stages.atk),
+            StatStages::apply(self.stats.def, stages.def),
+            false,
+        ) as u16
     }
 
     fn damage_rolls(&self, target: &Self, stages: &StatStages, target_stages: &StatStages, mv: &Move, crit: bool) -> &[(u16, f64)] {

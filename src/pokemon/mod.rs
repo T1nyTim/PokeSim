@@ -77,6 +77,15 @@ impl Pokemon {
         }
     }
 
+    pub(super) fn level_up(&mut self) {
+        if self.level >= 100 {
+            return;
+        }
+        self.level += 1;
+        println!("Level up: Lv. {}", self.level);
+        self.learn_level_up_moves();
+    }
+
     pub(super) fn stats(&self) -> Stats {
         Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, &StatExp::default())
     }
