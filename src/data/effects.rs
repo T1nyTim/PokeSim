@@ -53,18 +53,18 @@ pub enum Effect {
 }
 
 impl Effect {
-    pub const fn inflicts_status_condition(&self) -> bool {
+    pub(crate) const fn inflicts_status_condition(&self) -> bool {
         matches!(
             self,
             Self::BurnSide1 | Self::Paralyze | Self::ParalyzeSide2 | Self::Poison | Self::PoisonSide1 | Self::Sleep
         )
     }
 
-    pub const fn preserves_last_damage(&self) -> bool {
+    pub(crate) const fn preserves_last_damage(&self) -> bool {
         matches!(self, Self::Confusion | Self::FocusEnergy | Self::LeechSeed | Self::Poison)
     }
 
-    pub const fn resolution(&self) -> EffectResolution {
+    pub(crate) const fn resolution(&self) -> EffectResolution {
         match *self {
             Self::Bide => EffectResolution::Bide,
             Self::MirrorMove => EffectResolution::CopyMove,
@@ -112,11 +112,11 @@ impl Effect {
         }
     }
 
-    pub const fn targets_user(&self) -> bool {
+    pub(crate) const fn targets_user(&self) -> bool {
         matches!(self, Self::Bide | Self::DefenseUp1 | Self::FocusEnergy | Self::SpecialUp1 | Self::SpeedUp)
     }
 
-    pub fn apply_secondary(&self, target: &mut CombatantState) {
+    pub(crate) fn apply_secondary(&self, target: &mut CombatantState) {
         match *self {
             Self::PoisonSide1 => target.poison(),
             Self::DefenseDownSide => self.apply_status(&mut target.stages),
@@ -164,7 +164,7 @@ impl Effect {
         }
     }
 
-    pub fn apply_status(&self, stages: &mut StatStages) {
+    pub(crate) fn apply_status(&self, stages: &mut StatStages) {
         match *self {
             Self::AccuracyDown => stages.acc = (stages.acc - 1).max(-6),
             Self::AttackDown => stages.atk = (stages.atk - 1).max(-6),
@@ -211,7 +211,7 @@ impl Effect {
         }
     }
 
-    pub fn bide_outcomes(&self) -> [(BideState, f64); 2] {
+    pub(crate) fn bide_outcomes(&self) -> [(BideState, f64); 2] {
         if matches!(self, Self::Bide) {
             [(BideState::new(2), 0.5), (BideState::new(3), 0.5)]
         } else {
@@ -219,7 +219,7 @@ impl Effect {
         }
     }
 
-    pub fn disable_outcomes(&self, occupied_slots: [bool; 4], pp: Option<&[u8; 4]>) -> Vec<(DisableState, f64)> {
+    pub(crate) fn disable_outcomes(&self, occupied_slots: [bool; 4], pp: Option<&[u8; 4]>) -> Vec<(DisableState, f64)> {
         if !matches!(self, Self::Disable) {
             unreachable!("Only Disable disables a move")
         }
@@ -238,7 +238,7 @@ impl Effect {
         outcomes
     }
 
-    pub fn drained_hp(&self, dmg_dealt: u16) -> u16 {
+    pub(crate) fn drained_hp(&self, dmg_dealt: u16) -> u16 {
         if dmg_dealt > 0 && matches!(self, Self::DrainHp) {
             (dmg_dealt / 2).max(1)
         } else {
@@ -246,10 +246,19 @@ impl Effect {
         }
     }
 
-    pub fn duration_end_probability(&self, turns_elapsed: u8) -> f64 {
+    pub(crate) fn duration_end_probability(&self, turns_elapsed: u8) -> f64 {
         let max_turns = match *self {
-            Self::Sleep => 7,
             Self::Disable => 8,
+            Self::Sleep => 7,
+            Self::Trapping => {
+                return match turns_elapsed {
+                    0 => 3.0 / 8.0,
+                    1 => 3.0 / 5.0,
+                    2 => 1.0 / 2.0,
+                    3 => 1.0,
+                    _ => unreachable!("A trapping move must end after its 4th follow-up hit"),
+                };
+            }
             Self::NoEffect
             | Self::AccuracyDown
             | Self::AttackDown
@@ -288,14 +297,13 @@ impl Effect {
             | Self::Swift
             | Self::SwitchAndTeleport
             | Self::ThrashPetalDance
-            | Self::Trapping
             | Self::Twineedle
-            | Self::TwoToFiveAttacks => unreachable!("Only Sleep and Disable defer their durations"),
+            | Self::TwoToFiveAttacks => unreachable!("Only Disable, Sleep and trapping moves defer their durations"),
         };
         1.0 / f64::from(max_turns - turns_elapsed)
     }
 
-    pub fn hit_probability(&self, probability: f64, is_ai: bool) -> f64 {
+    pub(crate) fn hit_probability(&self, probability: f64, is_ai: bool) -> f64 {
         match *self {
             Self::Bide | Self::DefenseUp1 => 1.0,
             Self::NoEffect
@@ -344,15 +352,7 @@ impl Effect {
         }
     }
 
-    pub fn recoil_damage(&self, damage_dealt: u16, divisor: u16) -> u16 {
-        if damage_dealt > 0 && matches!(self, Self::Recoil) {
-            (damage_dealt / divisor).max(1)
-        } else {
-            0
-        }
-    }
-
-    pub fn secondary_probability(&self, target: &CombatantState, target_types: &[Type; 2], is_ai: bool) -> f64 {
+    pub(crate) fn secondary_probability(&self, target: &CombatantState, target_types: &[Type; 2], is_ai: bool) -> f64 {
         if target.hp == 0 {
             return 0.0;
         }
@@ -408,11 +408,11 @@ impl Effect {
         }
     }
 
-    pub fn trapping_outcomes(&self) -> [(u8, f64); 4] {
-        if matches!(self, Self::Trapping) {
-            [(2, 3.0 / 8.0), (3, 3.0 / 8.0), (4, 1.0 / 8.0), (5, 1.0 / 8.0)]
+    pub(super) fn recoil_damage(&self, damage_dealt: u16, divisor: u16) -> u16 {
+        if damage_dealt > 0 && matches!(self, Self::Recoil) {
+            (damage_dealt / divisor).max(1)
         } else {
-            unreachable!("Only trapping moves have trapping durations")
+            0
         }
     }
 

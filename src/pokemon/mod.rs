@@ -15,9 +15,9 @@ pub struct Dvs {
 }
 
 impl Dvs {
-    pub const AVERAGE: Self = Self::new(7, 8, 8, 8);
-    pub const TRAINER: Self = Self::new(9, 8, 8, 8);
-    pub const WILD: Self = Self::new(0, 0, 0, 0);
+    pub(super) const AVERAGE: Self = Self::new(7, 8, 8, 8);
+    pub(super) const TRAINER: Self = Self::new(9, 8, 8, 8);
+    pub(super) const WILD: Self = Self::new(0, 0, 0, 0);
 
     const fn new(atk: u8, def: u8, spd: u8, spc: u8) -> Self {
         Self {
@@ -38,7 +38,7 @@ pub struct Pokemon {
 }
 
 impl Pokemon {
-    pub fn from_species(species: &'static Species, dvs: Dvs, level: u8) -> Self {
+    pub(super) fn from_species(species: &'static Species, dvs: Dvs, level: u8) -> Self {
         let mut moves = species.learnset;
         for &(lv, mv) in species.evo_moves {
             if lv > level {
@@ -57,15 +57,15 @@ impl Pokemon {
         Self { species, dvs, level, moves }
     }
 
-    pub const fn base_stats(&self) -> &BaseStats {
+    pub(super) const fn base_stats(&self) -> &BaseStats {
         &self.species.base_stats
     }
 
-    pub const fn name(&self) -> &'static str {
+    pub(super) const fn name(&self) -> &'static str {
         self.species.name()
     }
 
-    pub fn learn_level_up_moves(&mut self) {
+    pub(super) fn learn_level_up_moves(&mut self) {
         for &(level, mv) in self.species.evo_moves {
             if level != self.level || self.moves.contains(&Some(mv)) {
                 continue;
@@ -77,11 +77,11 @@ impl Pokemon {
         }
     }
 
-    pub fn stats(&self) -> Stats {
+    pub(super) fn stats(&self) -> Stats {
         Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, &StatExp::default())
     }
 
-    pub fn try_evolve(&mut self) {
+    pub(super) fn try_evolve(&mut self) {
         if let Some(species) = self.species.evolution_at(self.level) {
             self.species = species;
             println!("Evolved to {}", self.name());
@@ -104,7 +104,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn from_base_stats(base_stats: &BaseStats, dvs: &Dvs, level: u8, stat_exp: &StatExp) -> Self {
+    pub(super) fn from_base_stats(base_stats: &BaseStats, dvs: &Dvs, level: u8, stat_exp: &StatExp) -> Self {
         let lv = u16::from(level);
         Self {
             hp: ((u16::from(base_stats.hp) + u16::from(dvs.hp)) * 2 + (f32::from(stat_exp.hp).sqrt().ceil() as u16).min(255) / 4) * lv / 100

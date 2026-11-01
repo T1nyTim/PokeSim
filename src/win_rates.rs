@@ -28,7 +28,7 @@ impl fmt::Display for WinRates {
 }
 
 impl WinRates {
-    pub fn record(&mut self, kind: &MatchupKind, outcome: &BattleOutcome) {
+    pub(super) fn record(&mut self, kind: &MatchupKind, outcome: &BattleOutcome) {
         self.overall.record(outcome);
         match *kind {
             MatchupKind::Boss => {

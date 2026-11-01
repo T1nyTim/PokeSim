@@ -2,6 +2,8 @@ pub mod effects;
 pub mod moves;
 pub mod species;
 
+use core::hash::{Hash, Hasher};
+
 use crate::data::{effects::Effect, moves::STRUGGLE};
 
 pub enum Evolve {
@@ -25,7 +27,7 @@ pub enum GrowthRate {
 }
 
 impl GrowthRate {
-    pub fn experience_at(&self, level: u8) -> u32 {
+    pub(super) fn experience_at(&self, level: u8) -> u32 {
         let lv = i32::from(level);
         let total = match *self {
             Self::Fast => lv.pow(3) * 4i32 / 5i32,
@@ -307,7 +309,7 @@ pub enum Type {
 }
 
 impl Type {
-    pub const fn effectiveness(&self, target: &Self) -> u32 {
+    pub(super) const fn effectiveness(&self, target: &Self) -> u32 {
         match (self, target) {
             (&Self::Fire | &Self::Flying | &Self::Poison | &Self::Rock, &Self::Bug)
             | (&Self::Flying | &Self::Psychic, &Self::Fighting)
@@ -340,7 +342,7 @@ impl Type {
         }
     }
 
-    pub const fn is_special(&self) -> bool {
+    pub(super) const fn is_special(&self) -> bool {
         matches!(self, Self::Fire | Self::Grass | Self::Psychic) // Dragon, Electric, Ice, Water
     }
 }
@@ -354,12 +356,12 @@ pub struct BaseStats {
 }
 
 impl BaseStats {
-    pub const fn new(hp: u8, atk: u8, def: u8, spd: u8, spc: u8) -> Self {
+    pub(super) const fn new(hp: u8, atk: u8, def: u8, spd: u8, spc: u8) -> Self {
         Self { hp, atk, def, spd, spc }
     }
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Move {
     kind: MoveKind,
     pub effect: Effect,
@@ -367,6 +369,16 @@ pub struct Move {
     pub mv_type: Type,
     accuracy: u8,
     pub pp: u8,
+}
+
+#[expect(clippy::missing_trait_methods, reason = "hash_slice method not required")]
+impl Hash for Move {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.kind.hash(state);
+    }
 }
 
 impl Move {
@@ -381,15 +393,15 @@ impl Move {
         }
     }
 
-    pub const fn accuracy(&self) -> u8 {
+    pub(super) const fn accuracy(&self) -> u8 {
         (self.accuracy as u16 * 255 / 100) as u8
     }
 
-    pub const fn name(&self) -> &'static str {
+    pub(super) const fn name(&self) -> &'static str {
         self.kind.as_str()
     }
 
-    pub fn recoil_damage(&self, damage_dealt: u16) -> u16 {
+    pub(super) fn recoil_damage(&self, damage_dealt: u16) -> u16 {
         let divisor = if self == &STRUGGLE { 2 } else { 4 };
         self.effect.recoil_damage(damage_dealt, divisor)
     }
@@ -408,7 +420,7 @@ pub struct Species {
 
 impl Species {
     #[expect(clippy::too_many_arguments, reason = "to be looked at")]
-    pub const fn new(
+    pub(super) const fn new(
         kind: SpeciesKind,
         base_stats: BaseStats,
         types: [Type; 2],
@@ -430,11 +442,11 @@ impl Species {
         }
     }
 
-    pub const fn name(&self) -> &'static str {
+    pub(super) const fn name(&self) -> &'static str {
         self.kind.as_str()
     }
 
-    pub fn evolution_at(&self, level: u8) -> Option<&'static Self> {
+    pub(super) fn evolution_at(&self, level: u8) -> Option<&'static Self> {
         self.evolution
             .iter()
             .find_map(|(condition, species)| condition.is_met(level).then_some(*species))

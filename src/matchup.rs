@@ -5,15 +5,15 @@ use crate::{
     pokemon::Pokemon,
 };
 
-// pub const BROCK: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const BUG_CATCHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const BROCK: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const BUG_CATCHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const HIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const JR_TRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const LASS: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const JR_TRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const LASS: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const RIVAL1: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const ROCKET: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const SUPER_NERD: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
-// pub const YOUNGSTER: &[AiPolicy] = &[];
+pub const YOUNGSTER: &[AiPolicy] = &[];
 
 pub enum AiPolicy {
     DecreaseStatusCondition,
@@ -41,7 +41,13 @@ pub enum PlayerPolicy {
 }
 
 impl PlayerPolicy {
-    pub fn select<F>(&self, moves: &[Option<&'static Move>; 4], pp: [u8; 4], disabled_slot: Option<u8>, damage: F) -> (Option<usize>, &'static Move)
+    pub(super) fn select<F>(
+        &self,
+        moves: &[Option<&'static Move>; 4],
+        pp: [u8; 4],
+        disabled_slot: Option<u8>,
+        damage: F,
+    ) -> (Option<usize>, &'static Move)
     where
         F: Fn(&Move) -> f64,
     {
@@ -72,7 +78,7 @@ pub struct Encounter {
 }
 
 impl Encounter {
-    pub const fn new(pokemon: &'static Pokemon) -> Self {
+    pub(super) const fn new(pokemon: &'static Pokemon) -> Self {
         Self {
             pokemon,
             max_depth: DEFAULT_MAX_DEPTH,
@@ -89,11 +95,11 @@ pub struct GameAi {
 }
 
 impl GameAi {
-    pub const fn new(policies: &'static [AiPolicy]) -> Self {
+    pub(super) const fn new(policies: &'static [AiPolicy]) -> Self {
         Self { policies }
     }
 
-    pub fn select(
+    pub(super) fn select(
         &self,
         moves: &[Option<&'static Move>; 4],
         disabled_slot: Option<u8>,
@@ -131,19 +137,19 @@ pub struct MatchupGroup {
 }
 
 impl MatchupGroup {
-    pub fn new_boss(party: Vec<&'static Pokemon>, policies: &'static [AiPolicy]) -> Self {
+    pub(super) fn new_boss(party: Vec<&'static Pokemon>, policies: &'static [AiPolicy]) -> Self {
         Self::new(MatchupKind::Boss, party, policies)
     }
 
-    pub fn new_trainer(party: Vec<&'static Pokemon>, policies: &'static [AiPolicy]) -> Self {
+    pub(super) fn new_trainer(party: Vec<&'static Pokemon>, policies: &'static [AiPolicy]) -> Self {
         Self::new(MatchupKind::Trainer, party, policies)
     }
 
-    pub fn new_wild(pokemon: &'static Pokemon) -> Self {
+    pub(super) fn new_wild(pokemon: &'static Pokemon) -> Self {
         Self::new(MatchupKind::Wild, vec![pokemon], &[])
     }
 
-    pub fn with_encounter_depth(mut self, party_index: usize, max_depth: usize) -> Self {
+    pub(super) fn with_encounter_depth(mut self, party_index: usize, max_depth: usize) -> Self {
         self.party
             .get_mut(party_index)
             .expect("A depth override must refer to an existing party member")
@@ -160,4 +166,4 @@ impl MatchupGroup {
     }
 }
 
-const DEFAULT_MAX_DEPTH: usize = 90;
+const DEFAULT_MAX_DEPTH: usize = 20;

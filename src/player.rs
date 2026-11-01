@@ -12,7 +12,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(active: Pokemon) -> Self {
+    pub(super) fn new(active: Pokemon) -> Self {
         let xp = active.species.growth.experience_at(active.level);
         Self {
             active,
@@ -22,14 +22,14 @@ impl Player {
         }
     }
 
-    pub fn finish_matchup(&mut self) {
+    pub(super) fn finish_matchup(&mut self) {
         if self.leveled_up {
             self.leveled_up = false;
             self.active.try_evolve();
         }
     }
 
-    pub fn gain_experience(&mut self, pokemon: &Pokemon, kind: &MatchupKind) {
+    pub(super) fn gain_experience(&mut self, pokemon: &Pokemon, kind: &MatchupKind) {
         let mut xp = u32::from(pokemon.species.base_exp) * u32::from(pokemon.level) / 7;
         if matches!(kind, MatchupKind::Boss | MatchupKind::Trainer) {
             xp += xp / 2;
@@ -45,7 +45,7 @@ impl Player {
         }
     }
 
-    pub fn stats(&self) -> Stats {
+    pub(super) fn stats(&self) -> Stats {
         Stats::from_base_stats(self.active.base_stats(), &self.active.dvs, self.active.level, &self.stat_exp)
     }
 }
