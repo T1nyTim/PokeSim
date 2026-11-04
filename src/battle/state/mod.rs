@@ -199,8 +199,8 @@ impl BattleState {
 
     pub(super) fn key(&self) -> BattleKey {
         BattleKey::new(
-            self.player.key(),
-            self.ai.key(),
+            CombatantKey::new(&self.player),
+            CombatantKey::new(&self.ai),
             u64::from(u32::from_le_bytes(self.player_pp)) | (u64::from(self.last_damage) << 32) | (u64::from(self.ai_items_left) << 48),
         )
     }
@@ -467,43 +467,6 @@ impl CombatantState {
         dmg_dealt
     }
 
-    fn key(&self) -> CombatantKey {
-        let [hp_low, hp_high] = self.hp.to_le_bytes();
-        let flags = u8::from(self.poisoned)
-            | (u8::from(self.seeded) << 1u8)
-            | (u8::from(self.bide.is_some()) << 2u8)
-            | (u8::from(self.burned) << 3u8)
-            | (u8::from(self.trapping.is_some()) << 4u8)
-            | (u8::from(self.paralyzed) << 5u8);
-        let present =
-            u8::from(self.sleep_elapsed.is_some()) | (u8::from(self.confusion_elapsed.is_some()) << 1u8) | (u8::from(self.disabled.is_some()) << 2u8);
-        let bide = self.bide.clone().unwrap_or(BideState::new(0));
-        let [damage_low, damage_high] = bide.damage.to_le_bytes();
-        CombatantKey::new(
-            u64::from_le_bytes([
-                hp_low,
-                hp_high,
-                self.stages.atk as u8,
-                self.stages.def as u8,
-                self.stages.spd as u8,
-                self.stages.spc as u8,
-                self.stages.acc as u8,
-                flags,
-            ]),
-            u64::from_le_bytes([
-                self.sleep_elapsed.unwrap_or(u8::MAX),
-                self.confusion_elapsed.unwrap_or(u8::MAX),
-                self.disabled.clone().map_or(u8::MAX, |disabled| disabled.slot),
-                self.disabled.clone().map_or(u8::MAX, |disabled| disabled.turns_elapsed),
-                bide.turns_left,
-                damage_low,
-                damage_high,
-                present,
-            ]),
-            self.trapping.clone(),
-        )
-    }
-
     fn new(hp: u16) -> Self {
         Self {
             hp,
@@ -595,6 +558,15 @@ struct TrappingState {
 }
 
 impl TrappingState {
+    const fn from_key(mv: &'static Move, damage: u16, turns_elapsed: u8, ends_this_turn: bool) -> Self {
+        Self {
+            mv,
+            damage,
+            turns_elapsed,
+            ends_this_turn,
+        }
+    }
+
     const fn new(mv: &'static Move, damage: u16) -> Self {
         Self {
             mv,
