@@ -1,7 +1,9 @@
 pub mod data;
 
 use crate::{
-    data::{BaseStats, Move, Species},
+    battle::state::CombatantState,
+    data::{BaseStats, Move, Species, effects::Effect},
+    journey::PlayerPolicy,
     player::StatExp,
 };
 
@@ -38,6 +40,27 @@ pub struct Pokemon {
 }
 
 impl Pokemon {
+    pub(super) const fn base_stats(&self) -> &BaseStats {
+        &self.species.base_stats
+    }
+
+    pub(super) const fn name(&self) -> &'static str {
+        self.species.name()
+    }
+
+    pub(super) fn base_damage(&self, power: u8, mut attack: u32, mut defense: u32, crit: bool) -> u32 {
+        if attack >= 256 || defense >= 256 {
+            attack = (attack / 4 % 256).max(1);
+            defense = defense / 4 % 256;
+        }
+        let level = u32::from(self.level) * if crit { 2 } else { 1 };
+        let damage = ((2 * level / 5 + 2) * u32::from(power) * attack)
+            .checked_div(defense)
+            .expect("The game does not account for 0 defense and crashes")
+            / 50;
+        damage.min(997) + 2
+    }
+
     pub(super) fn from_species(species: &'static Species, dvs: Dvs, level: u8) -> Self {
         let mut moves = species.learnset;
         for &(lv, mv) in species.evo_moves {
@@ -57,50 +80,82 @@ impl Pokemon {
         Self { species, dvs, level, moves }
     }
 
-    pub(super) const fn base_stats(&self) -> &BaseStats {
-        &self.species.base_stats
-    }
-
-    pub(super) const fn name(&self) -> &'static str {
-        self.species.name()
-    }
-
-    pub(super) fn learn_level_up_moves(&mut self) {
+    pub(super) fn learn_level_up_moves(&mut self, policy: &PlayerPolicy, stat_exp: &StatExp) {
+        let stats = Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, stat_exp);
         for &(level, mv) in self.species.evo_moves {
             if level != self.level || self.moves.contains(&Some(mv)) {
                 continue;
             }
-            if let Some(slot) = self.moves.iter_mut().find(|slot| slot.is_none()) {
-                *slot = Some(mv);
+            if let Some(slot) = policy.learn(&self.moves, mv, |candidate| self.expected_neutral_damage(&stats, candidate)) {
+                if let Some(forgotten) = self.moves[slot] {
+                    println!("Forgot: {}", forgotten.name());
+                }
+                self.moves[slot] = Some(mv);
                 println!("Learnt: {}", mv.name());
             }
         }
     }
 
-    pub(super) fn level_up(&mut self) {
+    pub(super) fn level_up(&mut self, policy: &PlayerPolicy, stat_exp: &StatExp) {
         if self.level >= 100 {
             return;
         }
         self.level += 1;
         println!("Level up: Lv. {}", self.level);
-        self.learn_level_up_moves();
+        self.learn_level_up_moves(policy, stat_exp);
     }
 
     pub(super) fn stats(&self) -> Stats {
         Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, &StatExp::default())
     }
 
-    pub(super) fn try_evolve(&mut self) {
+    pub(super) fn try_evolve(&mut self, policy: &PlayerPolicy, stat_exp: &StatExp) {
         if let Some(species) = self.species.evolution_at(self.level) {
             self.species = species;
             println!("Evolved to {}", self.name());
-            self.learn_level_up_moves();
+            self.learn_level_up_moves(policy, stat_exp);
         }
     }
 
     const fn with_move(mut self, mv: &'static Move) -> Self {
         self.moves[2] = Some(mv);
         self
+    }
+
+    fn expected_neutral_damage(&self, stats: &Stats, mv: &Move) -> f64 {
+        let hit_prob = f64::from(mv.accuracy()) / 256.0f64;
+        if matches!(mv.effect, Effect::LeechSeed | Effect::Poison) {
+            return f64::from(CombatantState::residual_damage(64)) * hit_prob;
+        }
+        if mv.power == 0 {
+            return 0.0;
+        }
+        let (attack, defense) = if mv.mv_type.is_special() {
+            (u32::from(stats.spc), 68)
+        } else {
+            (u32::from(stats.atk), 72)
+        };
+        let crit_prob = mv.crit_probability(self.base_stats().spd);
+        let mut expected_dmg = 0.0f64;
+        for (crit, probability) in [(false, 1.0f64 - crit_prob), (true, crit_prob)] {
+            let mut damage = self.base_damage(mv.power, attack, defense, crit);
+            if self.species.types.contains(&mv.mv_type) {
+                damage += damage / 2;
+            }
+            let avg_dmg = if damage <= 1 {
+                f64::from(damage)
+            } else {
+                (217..=255).map(|roll| f64::from(damage * roll / 255)).sum::<f64>() / 39.0f64
+            };
+            expected_dmg += avg_dmg * probability;
+        }
+        let expected_hits: f64 = mv
+            .effect
+            .hit_count_outcomes()
+            .iter()
+            .map(|&(hits, probabillity)| f64::from(hits) * probabillity)
+            .sum();
+        expected_dmg * expected_hits * hit_prob
     }
 }
 

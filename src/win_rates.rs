@@ -14,14 +14,24 @@ impl fmt::Display for WinRates {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for (label, results) in [("Overall", &self.overall), ("Trainer", &self.trainer), ("Bosses", &self.bosses)] {
             let percent = 100.0f64 / results.encounters as f64;
-            writeln!(
-                f,
-                "{label} ({} Pokemon): win {:.10}%, lose {:.10}%, unresolved {:.10}%",
-                results.encounters,
-                results.win * percent,
-                results.lose * percent,
-                results.unresolved * percent
-            )?;
+            if results.unresolved * percent > 1e-10f64 {
+                writeln!(
+                    f,
+                    "{label} ({} Pokemon): win {:.10}%, lose {:.10}%, unresolved {:.10}%",
+                    results.encounters,
+                    results.win * percent,
+                    results.lose * percent,
+                    results.unresolved * percent
+                )?;
+            } else {
+                writeln!(
+                    f,
+                    "{label} ({} Pokemon): win {:.10}%, lose {:.10}%",
+                    results.encounters,
+                    results.win * percent,
+                    results.lose * percent
+                )?;
+            }
         }
         Ok(())
     }

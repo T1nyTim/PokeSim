@@ -1,30 +1,30 @@
+mod combatant;
 pub mod state;
 mod turn;
 
 use core::{
     array,
-    cell::OnceCell,
     mem::{self, take},
 };
-use std::collections::HashMap;
 
 use crate::{
     battle::{
-        state::{BattleState, CombatantState, StatStages},
+        combatant::Combatant,
+        state::{
+            BattleState,
+            key::{BattleKey, StateMap},
+        },
         turn::{Branch, TurnAction, TurnContext},
     },
     data::{
         Move,
         effects::{Effect, EffectResolution},
-        moves::{self, BIDE, STRUGGLE},
+        moves::BIDE,
     },
-    journey::{GameAi, PlayerPolicy},
+    journey::{MatchupGroup, MatchupKind, PlayerPolicy, TrainerItem},
     player::Player,
-    pokemon::{Pokemon, Stats},
+    pokemon::Pokemon,
 };
-
-type AiChoice = ((Option<usize>, &'static Move), f64);
-type StagedDamageRolls = [[OnceCell<Vec<(u16, f64)>>; 13]; 13];
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum Side {
@@ -33,32 +33,40 @@ pub enum Side {
 }
 
 pub struct Battle<'battle> {
-    states: HashMap<BattleState, f64>,
-    branches: HashMap<Branch, f64>,
-    next_actions: HashMap<Branch, f64>,
+    states: StateMap<BattleKey>,
+    branches: StateMap<Branch>,
+    next_actions: StateMap<Branch>,
     player: Combatant<'battle>,
     player_policy: &'battle PlayerPolicy,
     ai: Combatant<'battle>,
-    ai_choices: [Vec<AiChoice>; 10],
+    ai_choices: [AiChoices; 20],
+    ai_item: Option<&'battle TrainerItem>,
+    is_trainer: bool,
     remaining_turns: usize,
     outcome: BattleOutcome,
 }
 
 impl<'battle> Battle<'battle> {
-    pub(super) fn new(player: &'battle Player, player_policy: &'battle PlayerPolicy, ai: &'battle Pokemon, game_ai: &GameAi) -> Self {
+    pub(super) fn new(player: &'battle Player, ai: &'battle Pokemon, matchup: &'battle MatchupGroup) -> Self {
         let player_combatant = Combatant::new(&player.active, player.stats());
         let ai_combatant = Combatant::new(ai, ai.stats());
         Self {
-            states: HashMap::new(),
-            branches: HashMap::new(),
-            next_actions: HashMap::new(),
+            states: StateMap::default(),
+            branches: StateMap::default(),
+            next_actions: StateMap::default(),
             player: player_combatant,
-            player_policy,
+            player_policy: &player.policy,
             ai: ai_combatant,
             ai_choices: array::from_fn(|key| {
-                let disabled_slot = (key / 2).checked_sub(1).map(|slot| slot as u8);
-                game_ai.select(&ai.moves, disabled_slot, key % 2 != 0)
+                let disabled_slot = (key % 10 / 2).checked_sub(1).map(|slot| slot as u8);
+                AiChoices::new(
+                    matchup
+                        .ai
+                        .select(&ai.moves, &player.active.species.types, disabled_slot, key % 2 != 0, key >= 10),
+                )
             }),
+            ai_item: matchup.ai.item(),
+            is_trainer: !matches!(matchup.kind, MatchupKind::Wild),
             remaining_turns: 0,
             outcome: BattleOutcome::default(),
         }
@@ -71,22 +79,23 @@ impl<'battle> Battle<'battle> {
         self.remaining_turns = max_depth;
         self.outcome = BattleOutcome::default();
         self.outcome.unresolved = 0.0f64;
-        let mut init_state = BattleState::new(&self.player, &self.ai);
+        let mut init_state = BattleState::new(&self.player, &self.ai, self.ai_item.map_or(0, |item| item.uses));
         init_state.cap_surplus_pp(self.remaining_turns);
-        self.states.insert(init_state, 1.0f64);
-        let mut current_states = HashMap::new();
+        self.states.insert(init_state.key(), 1.0f64);
+        let mut current_states = StateMap::default();
         let mut current_branches = take(&mut self.branches);
-        for _ in 0..max_depth {
+        for idx in 0..max_depth {
             if self.states.is_empty() {
                 break;
             }
             self.remaining_turns -= 1;
             mem::swap(&mut current_states, &mut self.states);
             #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
-            for (state, probability) in current_states.drain() {
+            for (state_key, probability) in current_states.drain() {
                 if probability == 0.0f64 {
                     continue;
                 }
+                let state = state_key.into_state();
                 let player_move = if state.player.is_asleep() {
                     None
                 } else if let Some(mv) = state.player.trapping_move() {
@@ -108,8 +117,10 @@ impl<'battle> Battle<'battle> {
                 } else if state.is_biding(Side::Ai) {
                     TurnAction::Move(None, &BIDE)
                 } else {
-                    let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2 + u8::from(state.player.has_status_condition());
-                    TurnAction::AiChoice(key)
+                    let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2
+                        + u8::from(state.player.has_status_condition())
+                        + if idx % 256 == 1 { 10 } else { 0 };
+                    TurnAction::AiChoice(key, 0)
                 };
                 let turn_branch = Branch::new(state, TurnContext::new([Some(TurnAction::new(player_move)), Some(ai_action)], None));
                 self.begin_turn(turn_branch, probability);
@@ -133,18 +144,19 @@ impl<'battle> Battle<'battle> {
             return;
         }
         let side = branch.turn.side.expect("Beginning an action requires an acting side");
-        if let Some(TurnAction::AiChoice(key)) = branch.turn.actions[1].as_ref()
+        if let Some(TurnAction::AiChoice(key, priority)) = branch.turn.actions[1].as_ref()
             && side == Side::Ai
         {
             let choice_idx = usize::from(*key);
-            let last = self.ai_choices[choice_idx].len() - 1;
+            let priority_idx = usize::from(*priority);
+            let last = self.ai_choices[choice_idx].moves[priority_idx].len() - 1;
             for idx in 0..last {
-                let ((slot, mv), choice_prob) = self.ai_choices[choice_idx][idx];
+                let ((slot, mv), choice_prob) = self.ai_choices[choice_idx].moves[priority_idx][idx];
                 let mut alternative = branch.clone();
                 alternative.turn.actions[1] = Some(TurnAction::Move(slot, mv));
                 self.begin_action(alternative, probability * choice_prob);
             }
-            let ((slot, mv), choice_prob) = self.ai_choices[choice_idx][last];
+            let ((slot, mv), choice_prob) = self.ai_choices[choice_idx].moves[priority_idx][last];
             branch.turn.actions[1] = Some(TurnAction::Move(slot, mv));
             probability *= choice_prob;
         }
@@ -158,6 +170,13 @@ impl<'battle> Battle<'battle> {
         if move_slot.is_some_and(|idx| attacker.is_disabled(idx)) {
             self.finish_action(branch, probability);
             return;
+        }
+        let paralysis_prob = attacker.full_paralysis_probability();
+        if paralysis_prob > 0.0f64 {
+            let mut immobilized = branch.clone();
+            immobilized.state.combatant_mut(side).interrupt_move();
+            self.finish_action(immobilized, probability * paralysis_prob);
+            probability *= 1.0f64 - paralysis_prob;
         }
         if attacker.trapping_move().is_some() {
             let expiry_prob = branch.state.continue_trapping(side);
@@ -175,7 +194,23 @@ impl<'battle> Battle<'battle> {
             return;
         }
         branch.state.begin_move(side, slot, &mv.effect);
-        let hit_prob = branch.turn.hit_probability(&branch.state);
+        let resolution = mv.effect.resolution();
+        if self.is_trainer && matches!(resolution, EffectResolution::SwitchOrEscape) {
+            self.finish_action(branch, probability);
+            return;
+        }
+        let (target, target_types) = match side {
+            Side::Player => (&branch.state.ai, &self.ai.pokemon.species.types),
+            Side::Ai => (&branch.state.player, &self.player.pokemon.species.types),
+        };
+        if matches!(resolution, EffectResolution::Disable) && !target.can_be_disabled()
+            || matches!(resolution, EffectResolution::Sleep) && !target.can_be_put_to_sleep()
+            || matches!(mv.effect, Effect::Paralyze) && !target.can_be_paralyzed()
+        {
+            self.finish_action(branch, probability);
+            return;
+        }
+        let hit_prob = branch.turn.hit_probability(&branch.state, target_types);
         if hit_prob == 0.0f64 {
             branch.state.miss_move();
             self.finish_action(branch, probability);
@@ -190,7 +225,7 @@ impl<'battle> Battle<'battle> {
         if probability == 0.0f64 {
             return;
         }
-        match mv.effect.resolution() {
+        match resolution {
             EffectResolution::Bide => {
                 let [(short, short_prob), (long, long_prob)] = mv.effect.bide_outcomes();
                 let mut alternative = branch.clone();
@@ -199,20 +234,7 @@ impl<'battle> Battle<'battle> {
                 branch.state.start_bide(side, long);
                 self.finish_action(branch, probability * long_prob);
             }
-            EffectResolution::Damage => {
-                let crit_prob = branch.turn.crit_probability(&self.player, &self.ai);
-                #[expect(clippy::float_cmp, reason = "Critical-hit probabilities are exact multiples of 1/256")]
-                if crit_prob == 1.0f64 {
-                    self.resolve_damage_rolls(branch, probability, true);
-                } else {
-                    if crit_prob > 0.0f64 {
-                        let critical = branch.clone();
-                        self.resolve_damage_rolls(critical, probability * crit_prob, true);
-                        probability *= 1.0f64 - crit_prob;
-                    }
-                    self.resolve_damage_rolls(branch, probability, false);
-                }
-            }
+            EffectResolution::Damage => self.resolve_damage_rolls(branch, probability),
             EffectResolution::Disable => {
                 let (target_side, occupied_slots, pp) = match side {
                     Side::Player => (Side::Ai, self.ai.pokemon.moves.map(|known_mv| known_mv.is_some()), None),
@@ -222,12 +244,8 @@ impl<'battle> Battle<'battle> {
                         Some(&branch.state.player_pp),
                     ),
                 };
-                if !branch.state.combatant(target_side).can_be_disabled() {
-                    self.finish_action(branch, probability);
-                    return;
-                }
                 let mut outcomes = mv.effect.disable_outcomes(occupied_slots, pp);
-                let Some((disabled, slot_prob)) = outcomes.pop() else {
+                let Some((disabled, slot_prob)) = outcomes.next_back() else {
                     self.finish_action(branch, probability);
                     return;
                 };
@@ -244,18 +262,10 @@ impl<'battle> Battle<'battle> {
                     Side::Player => Side::Ai,
                     Side::Ai => Side::Player,
                 };
-                if !branch.state.combatant(target_side).can_be_put_to_sleep() {
-                    self.finish_action(branch, probability);
-                    return;
-                }
                 branch.state.combatant_mut(target_side).fall_asleep();
                 self.finish_action(branch, probability);
             }
             EffectResolution::Status => {
-                let target_types = match side {
-                    Side::Player => &self.ai.pokemon.species.types,
-                    Side::Ai => &self.player.pokemon.species.types,
-                };
                 branch.state.apply_status_move(&mv.effect, side, target_types);
                 self.finish_action(branch, probability);
             }
@@ -267,16 +277,19 @@ impl<'battle> Battle<'battle> {
         if probability == 0.0f64 {
             return;
         }
-        if let Some(side) = branch.turn.resolve_order(&branch.state, &self.player, &self.ai) {
-            branch.turn.side = Some(side);
-        } else {
-            probability *= 0.5f64;
-            let mut alternative = branch.clone();
-            alternative.turn.side = Some(Side::Ai);
-            self.resolve_action(alternative, probability);
-            branch.turn.side = Some(Side::Player);
+        if let Some(TurnAction::AiChoice(key_ref, _)) = branch.turn.actions[1].as_ref() {
+            let key = *key_ref;
+            let [norm_prob, priority_prob] = self.ai_choices[usize::from(key)].probabilities;
+            if priority_prob > 0.0f64 {
+                if norm_prob > 0.0f64 {
+                    let normal = branch.clone();
+                    self.resolve_turn_order(normal, probability * norm_prob);
+                }
+                branch.turn.actions[1] = Some(TurnAction::AiChoice(key, 1));
+                probability *= priority_prob;
+            }
         }
-        self.resolve_action(branch, probability);
+        self.resolve_turn_order(branch, probability);
     }
 
     fn finish_action(&mut self, mut branch: Branch, probability: f64) {
@@ -309,14 +322,28 @@ impl<'battle> Battle<'battle> {
             return;
         }
         branch.state.cap_surplus_pp(self.remaining_turns);
-        *self.states.entry(branch.state).or_insert(0.0f64) += probability;
+        *self.states.entry(branch.state.key()).or_insert(0.0f64) += probability;
     }
 
     fn resolve_action(&mut self, mut branch: Branch, mut probability: f64) {
         if probability == 0.0f64 {
             return;
         }
-        let side = branch.turn.side.expect("Executing a move requires an acting side");
+        let side = branch.turn.side.expect("Executing an action requires an acting side");
+        if side == Side::Ai
+            && let Some(item) = self.ai_item
+        {
+            let item_prob = item.use_probability(branch.state.ai_items_left);
+            if item_prob > 0.0f64 {
+                let mut using_item = branch.clone();
+                using_item.state.use_ai_item(item);
+                self.finish_action(using_item, probability * item_prob);
+                probability *= 1.0f64 - item_prob;
+                if probability == 0.0f64 {
+                    return;
+                }
+            }
+        }
         if let Some(wake_prob) = branch.state.combatant_mut(side).advance_sleep() {
             if wake_prob < 1.0f64 {
                 let sleeping = branch.clone();
@@ -326,7 +353,7 @@ impl<'battle> Battle<'battle> {
             self.finish_action(branch, probability * wake_prob);
             return;
         }
-        if branch.state.is_trapped(side) {
+        if branch.state.is_trapped(side) || branch.turn.skips_action() {
             self.finish_action(branch, probability);
             return;
         }
@@ -354,11 +381,11 @@ impl<'battle> Battle<'battle> {
                     Side::Player => &self.player,
                     Side::Ai => &self.ai,
                 };
-                let damage = combatant.confusion_damage(&self_hit.state.combatant(side).stages);
+                let damage = combatant.confusion_damage(self_hit.state.combatant(side));
                 self_hit.state.hurt_in_confusion(side, damage);
                 self.finish_action(self_hit, continuing_prob);
                 if expiry_prob == 0.0f64 {
-                    self.begin_action(branch.clone(), continuing_prob);
+                    self.begin_action(branch, continuing_prob);
                     return;
                 }
                 self.begin_action(branch.clone(), continuing_prob);
@@ -390,25 +417,53 @@ impl<'battle> Battle<'battle> {
             Side::Player => (&branch.state.ai, &self.ai.pokemon.species.types),
             Side::Ai => (&branch.state.player, &self.player.pokemon.species.types),
         };
-        let secondary_prob = mv.effect.secondary_probability(target, target_types, side == Side::Ai);
+        let secondary_prob = if matches!(mv.effect, Effect::Flinch1) && !branch.turn.can_flinch_target() {
+            0.0f64
+        } else {
+            mv.effect.secondary_probability(target, target_types, &mv.mv_type, side == Side::Ai)
+        };
         if secondary_prob > 0.0f64 {
             let mut affected = branch.clone();
-            affected.state.apply_secondary(&mv.effect, side);
+            if matches!(mv.effect, Effect::Flinch1) {
+                affected.turn.flinch_target();
+            } else {
+                affected.state.apply_secondary(&mv.effect, side);
+            }
             self.finish_action(affected, probability * secondary_prob);
             probability *= 1.0f64 - secondary_prob;
         }
         self.finish_action(branch, probability);
     }
 
-    fn resolve_damage_rolls(&mut self, branch: Branch, probability: f64, crit: bool) {
+    fn resolve_damage_rolls(&mut self, branch: Branch, probability: f64) {
         if probability == 0.0f64 {
             return;
         }
-        let mut rolls = [(0, 0.0f64); 39];
+        let cached_rolls = branch.turn.damage_outcomes(&branch.state, &self.player, &self.ai);
+        let mut single_hit_rolls = [(0, 0.0f64); 78];
+        let mut extended_rolls;
+        let rolls: &mut [(u16, f64)] = if cached_rolls.len() <= single_hit_rolls.len() {
+            &mut single_hit_rolls
+        } else {
+            extended_rolls = vec![(0, 0.0f64); cached_rolls.len()];
+            &mut extended_rolls
+        };
         let roll_count = {
-            let cached_rolls = branch.turn.damage_rolls(&branch.state, &self.player, &self.ai, crit);
-            rolls[..cached_rolls.len()].copy_from_slice(cached_rolls);
-            cached_rolls.len()
+            let target_hp = match branch.turn.side.expect("Damage resolution requires an acting side") {
+                Side::Player => branch.state.ai.hp,
+                Side::Ai => branch.state.player.hp,
+            };
+            let mut count = 0;
+            for &(damage, roll_prob) in cached_rolls {
+                let dmg_dealt = damage.min(target_hp);
+                if count > 0 && rolls[count - 1].0 == dmg_dealt {
+                    rolls[count - 1].1 += roll_prob;
+                } else {
+                    rolls[count] = (dmg_dealt, roll_prob);
+                    count += 1;
+                }
+            }
+            count
         };
         let (&(last_dmg, last_prob), alternatives) = rolls[..roll_count]
             .split_last()
@@ -418,6 +473,19 @@ impl<'battle> Battle<'battle> {
             self.resolve_damage(alternative, probability * roll_prob, dmg);
         }
         self.resolve_damage(branch, probability * last_prob, last_dmg);
+    }
+
+    fn resolve_turn_order(&mut self, mut branch: Branch, mut probability: f64) {
+        if let Some(side) = branch.turn.resolve_order(&branch.state, &self.player, &self.ai) {
+            branch.turn.side = Some(side);
+        } else {
+            probability *= 0.5f64;
+            let mut alternative = branch.clone();
+            alternative.turn.side = Some(Side::Ai);
+            self.resolve_action(alternative, probability);
+            branch.turn.side = Some(Side::Player);
+        }
+        self.resolve_action(branch, probability);
     }
 }
 
@@ -447,139 +515,30 @@ impl BattleOutcome {
     }
 }
 
-pub struct Combatant<'battle> {
-    pokemon: &'battle Pokemon,
-    stats: Stats,
-    damage_rolls: HashMap<&'static Move, DamageRollCache>,
+type AiChoice = ((Option<usize>, &'static Move), f64);
+
+struct AiChoices {
+    moves: [Vec<AiChoice>; 2],
+    probabilities: [f64; 2],
 }
 
-impl<'battle> Combatant<'battle> {
-    fn new(pokemon: &'battle Pokemon, stats: Stats) -> Self {
-        Self {
-            pokemon,
-            stats,
-            damage_rolls: pokemon
-                .moves
-                .into_iter()
-                .flatten()
-                .chain([&STRUGGLE])
-                .map(|mv| (mv, DamageRollCache::new()))
-                .collect(),
-        }
-    }
-
-    fn base_damage(&self, power: u8, mut attack: u32, mut defense: u32, crit: bool) -> u32 {
-        if attack >= 256 || defense >= 256 {
-            attack = (attack / 4 % 256).max(1);
-            defense = defense / 4 % 256;
-        }
-        let level = u32::from(self.pokemon.level) * if crit { 2 } else { 1 };
-        let damage = ((2 * level / 5 + 2) * u32::from(power) * attack)
-            .checked_div(defense)
-            .expect("The game does not account for 0 defense and crashes")
-            / 50;
-        damage.min(997) + 2
-    }
-
-    fn crit_probability(&self, mv: &Move) -> f64 {
-        let mut threshold = u16::from(self.pokemon.base_stats().spd / 2);
-        // wrong place for this to be being managed
-        if mv == &moves::RAZOR_LEAF || mv == &moves::SLASH {
-            threshold = (threshold * 8).min(255);
-        }
-        f64::from(threshold) / 256.0
-    }
-
-    fn calculate_damage_rolls(&self, target: &Self, stages: &StatStages, target_stages: &StatStages, mv: &Move, crit: bool) -> Vec<(u16, f64)> {
-        let (attack, defense) = if mv.mv_type.is_special() {
-            (u32::from(self.stats.spc), u32::from(target.stats.spc))
-        } else if crit {
-            (u32::from(self.stats.atk), u32::from(target.stats.def))
-        } else {
-            (
-                StatStages::apply(self.stats.atk, stages.atk),
-                StatStages::apply(target.stats.def, target_stages.def),
-            )
+impl AiChoices {
+    fn new(choices: Vec<AiChoice>) -> Self {
+        let mut result = Self {
+            moves: array::from_fn(|_| Vec::new()),
+            probabilities: [0.0f64; 2],
         };
-        let mut damage = self.base_damage(mv.power, attack, defense, crit);
-        if self.pokemon.species.types.contains(&mv.mv_type) {
-            damage += damage / 2;
+        for choice in choices {
+            let ((_, mv), probability) = choice;
+            let priority = usize::from(mv.priority());
+            result.probabilities[priority] += probability;
+            result.moves[priority].push(choice);
         }
-        let types = &target.pokemon.species.types;
-        damage = damage * mv.mv_type.effectiveness(&types[0]) / 10;
-        if types[1] != types[0] {
-            damage = damage * mv.mv_type.effectiveness(&types[1]) / 10;
-        }
-        if damage <= 1 {
-            return vec![(damage as u16, 1.0)];
-        }
-        let mut rolls: Vec<(u16, u8)> = Vec::new();
-        for roll in 217..=255 {
-            let rolled_damage = (damage * roll / 255) as u16;
-            if let Some((previous_damage, count)) = rolls.last_mut()
-                && *previous_damage == rolled_damage
-            {
-                *count += 1u8;
-                continue;
-            }
-            rolls.push((rolled_damage, 1u8));
-        }
-        rolls.into_iter().map(|(dmg, count)| (dmg, f64::from(count) / 39.0f64)).collect()
-    }
-
-    fn confusion_damage(&self, stages: &StatStages) -> u16 {
-        self.base_damage(
-            40,
-            StatStages::apply(self.stats.atk, stages.atk),
-            StatStages::apply(self.stats.def, stages.def),
-            false,
-        ) as u16
-    }
-
-    fn damage_rolls(&self, target: &Self, stages: &StatStages, target_stages: &StatStages, mv: &Move, crit: bool) -> &[(u16, f64)] {
-        let cache = self.damage_rolls.get(mv).expect("A selected move must have a damage-roll cache");
-        let rolls = if crit {
-            &cache.critical
-        } else if mv.mv_type.is_special() {
-            &cache.normal[6][6]
-        } else {
-            &cache.normal[(stages.atk + 6) as usize][(target_stages.def + 6) as usize]
-        };
-        rolls.get_or_init(|| self.calculate_damage_rolls(target, stages, target_stages, mv, crit))
-    }
-
-    fn expected_damage(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> f64 {
-        let hit_probability = state.stages.hit_probability(mv);
-        if matches!(mv.effect, Effect::LeechSeed) {
-            if !target_state.can_be_seeded(&target.pokemon.species.types) {
-                return 0.0;
-            }
-            return f64::from(CombatantState::residual_damage(target.stats.hp).min(target_state.hp)) * hit_probability;
-        }
-        if mv.power == 0 {
-            return 0.0;
-        }
-        let crit_probability = self.crit_probability(mv);
-        let mut expected_damage = 0.0f64;
-        for (crit, probability) in [(false, 1.0f64 - crit_probability), (true, crit_probability)] {
-            for &(damage, roll_probability) in self.damage_rolls(target, &state.stages, &target_state.stages, mv, crit) {
-                expected_damage += f64::from(damage.min(target_state.hp)) * probability * roll_probability;
+        for (moves, probability) in result.moves.iter_mut().zip(result.probabilities) {
+            for (_, choice_prob) in moves {
+                *choice_prob /= probability;
             }
         }
-        expected_damage * hit_probability
-    }
-}
-
-struct DamageRollCache {
-    normal: StagedDamageRolls,
-    critical: OnceCell<Vec<(u16, f64)>>,
-}
-
-impl DamageRollCache {
-    fn new() -> Self {
-        Self {
-            normal: array::from_fn(|_| array::from_fn(|_| OnceCell::new())),
-            critical: OnceCell::new(),
-        }
+        result
     }
 }

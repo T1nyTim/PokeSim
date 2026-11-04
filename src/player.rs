@@ -1,21 +1,23 @@
 use crate::{
     data::{BaseStats, Item},
-    journey::MatchupKind,
+    journey::{MatchupKind, PlayerPolicy},
     pokemon::{Pokemon, Stats},
 };
 
 pub struct Player {
     pub active: Pokemon,
+    pub policy: PlayerPolicy,
     xp: u32,
     stat_exp: StatExp,
     leveled_up: bool,
 }
 
 impl Player {
-    pub(super) fn new(active: Pokemon) -> Self {
+    pub(super) fn new(active: Pokemon, policy: PlayerPolicy) -> Self {
         let xp = active.species.growth.experience_at(active.level);
         Self {
             active,
+            policy,
             xp,
             stat_exp: StatExp::default(),
             leveled_up: false,
@@ -25,7 +27,7 @@ impl Player {
     pub(super) fn finish_matchup(&mut self) {
         if self.leveled_up {
             self.leveled_up = false;
-            self.active.try_evolve();
+            self.active.try_evolve(&self.policy, &self.stat_exp);
         }
     }
 
@@ -38,7 +40,7 @@ impl Player {
         let growth = &self.active.species.growth;
         self.xp = (self.xp + xp).min(growth.experience_at(100));
         while self.active.level < 100 && self.xp >= growth.experience_at(self.active.level + 1) {
-            self.active.level_up();
+            self.active.level_up(&self.policy, &self.stat_exp);
             self.leveled_up = true;
         }
     }
@@ -48,9 +50,21 @@ impl Player {
     }
 
     pub(super) fn use_item(&mut self, item: &Item) -> bool {
+        // Doesn't feel like the right place to keep this
         let used = match item {
             Item::HpUp => self.stat_exp.use_hp_up(),
-            Item::MoonStone => todo!(),
+            Item::RareCandy => {
+                if self.active.level >= 100 {
+                    return false;
+                }
+                self.active.level_up(&self.policy, &self.stat_exp);
+                self.xp = self.active.species.growth.experience_at(self.active.level);
+                self.leveled_up = true;
+                self.finish_matchup();
+                true
+            }
+            Item::XDefend => false,
+            Item::LeafStone | Item::MoonStone | Item::ThunderStone | Item::WaterStone => todo!(),
         };
         if used {
             println!("Used: {}", item.name());

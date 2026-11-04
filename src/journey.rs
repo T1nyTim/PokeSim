@@ -1,31 +1,46 @@
 use core::array;
 
 use crate::{
-    data::{Item, Move, moves::STRUGGLE},
+    data::{Item, Move, Type, effects::Effect, moves::STRUGGLE},
     pokemon::Pokemon,
 };
 
 pub const BROCK: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const BUG_CATCHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const HIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const HIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const JR_TRAINER_F: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const JR_TRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const LASS: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const MISTY: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const RIVAL1: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const ROCKET: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const SUPER_NERD: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
+pub const SUPER_NERD: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
+pub const SWIMMER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const YOUNGSTER: &[AiPolicy] = &[];
 
 pub enum AiPolicy {
     DecreaseStatusCondition,
-    // IncreaseEffect,
-    // IncreaseSuperEffective,
+    IncreaseEffect,
+    TypeEffectiveness,
 }
 
 impl AiPolicy {
-    const fn score(&self, status_move: bool, target_has_status: bool) -> u8 {
+    fn score(&self, mv: &Move, moves: &[Option<&Move>; 4], target_types: &[Type; 2], target_has_status: bool, second_turn: bool) -> i8 {
         match *self {
-            Self::DecreaseStatusCondition if status_move && target_has_status => 5,
-            Self::DecreaseStatusCondition => 0,
+            Self::DecreaseStatusCondition if mv.power == 0 && mv.effect.inflicts_status_condition() && target_has_status => 5,
+            Self::IncreaseEffect if second_turn && mv.effect.encouraged_by_ai() => -1,
+            Self::TypeEffectiveness => match mv.mv_type.ai_effectiveness(target_types) {
+                20 => -1,
+                0 | 5
+                    if moves.iter().flatten().any(|other| {
+                        matches!(other.effect, Effect::SpecialDamage | Effect::SuperFang) || (other.power > 0 && other.mv_type != mv.mv_type)
+                    }) =>
+                {
+                    1
+                }
+                _ => 0,
+            },
+            Self::DecreaseStatusCondition | Self::IncreaseEffect => 0,
         }
     }
 }
@@ -46,6 +61,32 @@ pub enum PlayerPolicy {
 }
 
 impl PlayerPolicy {
+    pub(super) fn learn<F>(&self, moves: &[Option<&'static Move>; 4], new_move: &'static Move, damage: F) -> Option<usize>
+    where
+        F: Fn(&Move) -> f64,
+    {
+        if moves.contains(&Some(new_move)) {
+            return None;
+        }
+        if let Some(slot) = moves.iter().position(Option::is_none) {
+            return Some(slot);
+        }
+        match self {
+            Self::MostDmg => {
+                let mut choice = None;
+                let mut least_dmg = damage(new_move);
+                for (slot, mv) in moves.iter().enumerate() {
+                    let expected_dmg = damage(mv.expect("All move slots are occupied"));
+                    if expected_dmg < least_dmg {
+                        choice = Some(slot);
+                        least_dmg = expected_dmg;
+                    }
+                }
+                choice
+            }
+        }
+    }
+
     pub(super) fn select<F>(
         &self,
         moves: &[Option<&'static Move>; 4],
@@ -97,22 +138,33 @@ impl Encounter {
 
 pub struct GameAi {
     policies: &'static [AiPolicy],
+    item: Option<TrainerItem>,
 }
 
 impl GameAi {
+    pub(super) const fn item(&self) -> Option<&TrainerItem> {
+        self.item.as_ref()
+    }
+
     pub(super) const fn new(policies: &'static [AiPolicy]) -> Self {
-        Self { policies }
+        Self { policies, item: None }
     }
 
     pub(super) fn select(
         &self,
         moves: &[Option<&'static Move>; 4],
+        target_types: &[Type; 2],
         disabled_slot: Option<u8>,
         target_has_status: bool,
+        second_turn: bool,
     ) -> Vec<((Option<usize>, &'static Move), f64)> {
-        let scores: [u8; 4] = array::from_fn(|slot| {
-            let status_move = moves[slot].is_some_and(|mv| mv.power == 0 && mv.effect.inflicts_status_condition());
-            self.policies.iter().map(|policy| policy.score(status_move, target_has_status)).sum()
+        let scores: [i8; 4] = array::from_fn(|slot| {
+            moves[slot].map_or(0, |mv| {
+                self.policies
+                    .iter()
+                    .map(|policy| policy.score(mv, moves, target_types, target_has_status, second_turn))
+                    .sum()
+            })
         });
         let best_score = moves
             .iter()
@@ -133,6 +185,10 @@ impl GameAi {
         let probability = 1.0f64 / choices.len() as f64;
         choices.into_iter().map(|choice| (choice, probability)).collect()
     }
+
+    const fn with_item(&mut self, item: &Item, probability: f64, uses: u8) {
+        self.item = Some(TrainerItem::new(item, probability, uses));
+    }
 }
 
 pub struct MatchupGroup {
@@ -142,6 +198,11 @@ pub struct MatchupGroup {
 }
 
 impl MatchupGroup {
+    pub(super) const fn with_item(mut self, item: &Item, probability: f64, uses: u8) -> Self {
+        self.ai.with_item(item, probability, uses);
+        self
+    }
+
     pub(super) fn new_boss(party: Vec<&'static Pokemon>, policies: &'static [AiPolicy]) -> Self {
         Self::new(MatchupKind::Boss, party, policies)
     }
@@ -167,6 +228,26 @@ impl MatchupGroup {
             kind,
             party: party.into_iter().map(Encounter::new).collect(),
             ai: GameAi::new(policies),
+        }
+    }
+}
+
+pub struct TrainerItem {
+    pub effect: &'static Effect,
+    probability: f64,
+    pub uses: u8,
+}
+
+impl TrainerItem {
+    pub(super) const fn use_probability(&self, remaining: u8) -> f64 {
+        if remaining == 0 { 0.0 } else { self.probability }
+    }
+
+    const fn new(item: &Item, probability: f64, uses: u8) -> Self {
+        Self {
+            effect: item.battle_effect().expect("A trainer item must have a supported battled effect"),
+            probability,
+            uses,
         }
     }
 }

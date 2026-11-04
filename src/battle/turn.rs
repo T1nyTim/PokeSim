@@ -1,17 +1,14 @@
 use core::cmp::Ordering;
 
 use crate::{
-    battle::{
-        Combatant, Side,
-        state::{BattleState, StatStages},
-    },
-    data::Move,
+    battle::{Combatant, Side, state::BattleState},
+    data::{Move, Type},
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub(super) enum TurnAction {
     Move(Option<usize>, &'static Move),
-    AiChoice(u8),
+    AiChoice(u8, u8),
     Skip,
 }
 
@@ -20,6 +17,14 @@ impl TurnAction {
         match selected_move {
             Some((slot, mv)) => Self::Move(slot, mv),
             None => Self::Skip,
+        }
+    }
+
+    const fn priority(&self) -> u8 {
+        match self {
+            Self::Move(_, mv) => mv.priority(),
+            Self::AiChoice(_, priority) => *priority,
+            Self::Skip => 0,
         }
     }
 }
@@ -43,6 +48,24 @@ pub(super) struct TurnContext {
 }
 
 impl TurnContext {
+    pub(super) const fn can_flinch_target(&self) -> bool {
+        let slot = match self.side.expect("Flinching requires an acting side") {
+            Side::Player => 1,
+            Side::Ai => 0,
+        };
+        matches!(self.actions[slot], Some(TurnAction::Move(_, _) | TurnAction::AiChoice(_, _)))
+    }
+
+    pub(super) const fn flinch_target(&mut self) {
+        let slot = match self.side.expect("Flinching requires an acting side") {
+            Side::Player => 1,
+            Side::Ai => 0,
+        };
+        if self.actions[slot].is_some() {
+            self.actions[slot] = Some(TurnAction::Skip);
+        }
+    }
+
     pub(super) const fn new(actions: [Option<TurnAction>; 2], side: Option<Side>) -> Self {
         Self { actions, side }
     }
@@ -54,32 +77,30 @@ impl TurnContext {
         };
         match self.actions[slot].as_ref().expect("The acting combatant must have a pending action") {
             TurnAction::Move(idx, mv) => (*idx, *mv),
-            TurnAction::AiChoice(_) | TurnAction::Skip => unreachable!(),
+            TurnAction::AiChoice(_, _) | TurnAction::Skip => unreachable!(),
         }
     }
 
-    pub(super) fn crit_probability(&self, player: &Combatant<'_>, ai: &Combatant<'_>) -> f64 {
-        let attacker = match self.side.expect("Critical-hit resolution must have an acting side") {
-            Side::Player => player,
-            Side::Ai => ai,
+    pub(super) const fn skips_action(&self) -> bool {
+        let slot = match self.side.expect("Checking an action requires an acting side") {
+            Side::Player => 0,
+            Side::Ai => 1,
         };
-        let (_, mv) = self.selected_move();
-        attacker.crit_probability(mv)
+        matches!(self.actions[slot], Some(TurnAction::Skip))
     }
 
-    pub(super) fn damage_rolls<'combatant>(
+    pub(super) fn damage_outcomes<'combatant>(
         &self,
         state: &BattleState,
         player: &'combatant Combatant<'_>,
         ai: &'combatant Combatant<'_>,
-        crit: bool,
     ) -> &'combatant [(u16, f64)] {
-        let (attacker, target, stages, target_stages) = match self.side.expect("Damage resolution must have an acting side") {
-            Side::Player => (player, ai, &state.player.stages, &state.ai.stages),
-            Side::Ai => (ai, player, &state.ai.stages, &state.player.stages),
+        let (attacker, target, attacker_state, target_state) = match self.side.expect("Damage resolution must have an acting side") {
+            Side::Player => (player, ai, &state.player, &state.ai),
+            Side::Ai => (ai, player, &state.ai, &state.player),
         };
         let (_, mv) = self.selected_move();
-        attacker.damage_rolls(target, stages, target_stages, mv, crit)
+        attacker.damage_outcomes(target, attacker_state, target_state, mv)
     }
 
     pub(super) fn finish_action(&mut self) {
@@ -96,7 +117,7 @@ impl TurnContext {
         };
     }
 
-    pub(super) fn hit_probability(&self, state: &BattleState) -> f64 {
+    pub(super) fn hit_probability(&self, state: &BattleState, target_types: &[Type; 2]) -> f64 {
         let (_, mv) = self.selected_move();
         let side = self.side.expect("Accuracy resolution must have an acting side");
         let attacker = match side {
@@ -104,14 +125,15 @@ impl TurnContext {
             Side::Ai => &state.ai,
         };
         let probability = attacker.stages.hit_probability(mv);
-        mv.effect.hit_probability(probability, side == Side::Ai)
+        mv.hit_probability(probability, target_types, side == Side::Ai)
     }
 
-    #[expect(clippy::unused_self, reason = "To be fixed")]
     pub(super) fn resolve_order(&self, state: &BattleState, player: &Combatant<'_>, ai: &Combatant<'_>) -> Option<Side> {
-        let player_spd = StatStages::apply(player.stats.spd, state.player.stages.spd);
-        let ai_spd = StatStages::apply(ai.stats.spd, state.ai.stages.spd);
-        let order = player_spd.cmp(&ai_spd);
+        let player_priority = self.actions[0].as_ref().map_or(0, TurnAction::priority);
+        let ai_priority = self.actions[1].as_ref().map_or(0, TurnAction::priority);
+        let player_spd = state.player.speed(player.stats.spd);
+        let ai_spd = state.ai.speed(ai.stats.spd);
+        let order = player_priority.cmp(&ai_priority).then_with(|| player_spd.cmp(&ai_spd));
         match order {
             Ordering::Greater => Some(Side::Player),
             Ordering::Less => Some(Side::Ai),
