@@ -1,4 +1,4 @@
-use crate::data::{Move, MoveKind, Type, effects::Effect};
+use crate::data::{Move, Type, effects::Effect, move_data::MoveKind};
 
 pub const ABSORB: Move = Move::new(MoveKind::Absorb, Effect::DrainHp, 20, Type::Grass, 100, 20);
 pub const ACID: Move = Move::new(MoveKind::Acid, Effect::DefenseDownSide, 40, Type::Poison, 100, 30);

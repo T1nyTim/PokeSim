@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use crate::{
     battle::state::{CombatantState, StatStages},
-    data::{Move, effects::Effect, moves::STRUGGLE},
+    data::{effects::Effect, move_data::Move, moves::STRUGGLE},
     pokemon::{Pokemon, Stats},
 };
 

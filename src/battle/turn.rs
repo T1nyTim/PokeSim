@@ -2,7 +2,7 @@ use core::cmp::Ordering;
 
 use crate::{
     battle::{Combatant, Side, state::BattleState},
-    data::{Move, Type},
+    data::{Type, move_data::Move},
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]

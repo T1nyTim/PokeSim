@@ -7,7 +7,7 @@ use crate::{
         Combatant, Side,
         state::key::{BattleKey, CombatantKey},
     },
-    data::{Move, Type, effects::Effect, moves::BIDE},
+    data::{Type, effects::Effect, move_data::Move, moves::BIDE},
     journey::TrainerItem,
 };
 

@@ -2,7 +2,7 @@ pub mod data;
 
 use crate::{
     battle::state::CombatantState,
-    data::{BaseStats, Move, Species, effects::Effect},
+    data::{BaseStats, Species, effects::Effect, move_data::Move},
     journey::PlayerPolicy,
     player::StatExp,
 };

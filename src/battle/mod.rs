@@ -17,8 +17,8 @@ use crate::{
         turn::{Branch, TurnAction, TurnContext},
     },
     data::{
-        Move,
         effects::{Effect, EffectResolution},
+        move_data::Move,
         moves::BIDE,
     },
     journey::{MatchupGroup, MatchupKind, PlayerPolicy, TrainerItem},

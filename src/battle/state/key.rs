@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
     battle::state::{BattleState, BideState, CombatantState, DisableState, StatStages, TrappingState},
-    data::Move,
+    data::move_data::Move,
 };
 
 pub type StateMap<K> = HashMap<K, f64, BuildHasherDefault<StateHasher>>;
