@@ -84,59 +84,75 @@ impl<'battle> Battle<'battle> {
         self.states.insert(init_state.key(), 1.0f64);
         let mut current_states = StateMap::default();
         let mut current_branches = take(&mut self.branches);
+        let mut batch_turns = false;
         for idx in 0..max_depth {
             if self.states.is_empty() {
                 break;
             }
             self.remaining_turns -= 1;
             mem::swap(&mut current_states, &mut self.states);
-            #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
-            for (state_key, probability) in current_states.drain() {
-                if probability == 0.0f64 {
-                    continue;
+            let second_turn = idx % 256 == 1;
+            batch_turns |= current_states.len() >= 4_096;
+            if !batch_turns {
+                #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
+                for (state_key, probability) in current_states.drain() {
+                    self.start_state_turn(&state_key, probability, second_turn);
+                    self.resolve_pending_actions(&mut current_branches);
                 }
-                let state = state_key.into_state();
-                let player_move = if state.player.is_asleep() {
-                    None
-                } else if let Some(mv) = state.player.trapping_move() {
-                    Some((None, mv))
-                } else if state.is_biding(Side::Player) {
-                    Some((None, &BIDE))
-                } else {
-                    Some(
-                        self.player_policy
-                            .select(&self.player.pokemon.moves, state.player_pp, state.player.disabled_slot(), |mv| {
-                                self.player.expected_damage(&self.ai, &state.player, &state.ai, mv)
-                            }),
-                    )
-                };
-                let ai_action = if state.ai.is_asleep() {
-                    TurnAction::Skip
-                } else if let Some(mv) = state.ai.trapping_move() {
-                    TurnAction::Move(None, mv)
-                } else if state.is_biding(Side::Ai) {
-                    TurnAction::Move(None, &BIDE)
-                } else {
-                    let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2
-                        + u8::from(state.player.has_status_condition())
-                        + if idx % 256 == 1 { 10 } else { 0 };
-                    TurnAction::AiChoice(key, 0)
-                };
-                let turn_branch = Branch::new(state, TurnContext::new([Some(TurnAction::new(player_move)), Some(ai_action)], None));
-                self.begin_turn(turn_branch, probability);
-                while !self.next_actions.is_empty() {
-                    mem::swap(&mut current_branches, &mut self.next_actions);
-                    #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
-                    for (branch, branch_prob) in current_branches.drain() {
-                        self.resolve_action(branch, branch_prob);
-                    }
-                }
+                continue;
             }
+            let mut ordered_states: Vec<_> = current_states
+                .iter()
+                .map(|(state_key, &probability)| (state_key.action_batch_order(), state_key, probability))
+                .collect();
+            ordered_states.sort_unstable_by_key(|entry| entry.0);
+            for batch in ordered_states.chunks(512) {
+                for &(_, state_key, probabillity) in batch {
+                    self.start_state_turn(state_key, probabillity, second_turn);
+                }
+                self.resolve_pending_actions(&mut current_branches);
+            }
+            current_states.clear();
         }
         self.branches = current_branches;
         self.outcome.unresolved += self.states.values().copied().fold(0.0f64, |total, prob| total + prob);
         self.states.clear();
         self.outcome.clone()
+    }
+
+    fn start_state_turn(&mut self, state_key: &BattleKey, probability: f64, second_turn: bool) {
+        if probability == 0.0f64 {
+            return;
+        }
+        let state = state_key.to_state();
+        let player_move = if state.player.is_asleep() {
+            None
+        } else if let Some(mv) = state.player.trapping_move() {
+            Some((None, mv))
+        } else if state.is_biding(Side::Player) {
+            Some((None, &BIDE))
+        } else {
+            Some(
+                self.player_policy
+                    .select(&self.player.pokemon.moves, state.player_pp, state.player.disabled_slot(), |mv| {
+                        self.player.expected_damage(&self.ai, &state.player, &state.ai, mv)
+                    }),
+            )
+        };
+        let ai_action = if state.ai.is_asleep() {
+            TurnAction::Skip
+        } else if let Some(mv) = state.ai.trapping_move() {
+            TurnAction::Move(None, mv)
+        } else if state.is_biding(Side::Ai) {
+            TurnAction::Move(None, &BIDE)
+        } else {
+            let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2
+                + u8::from(state.player.has_status_condition())
+                + if second_turn { 10 } else { 0 };
+            TurnAction::AiChoice(key, 0)
+        };
+        let turn_branch = Branch::new(state, TurnContext::new([Some(TurnAction::new(player_move)), Some(ai_action)], None));
+        self.begin_turn(turn_branch, probability);
     }
 
     fn begin_action(&mut self, mut branch: Branch, mut probability: f64) {
@@ -473,6 +489,16 @@ impl<'battle> Battle<'battle> {
             self.resolve_damage(alternative, probability * roll_prob, dmg);
         }
         self.resolve_damage(branch, probability * last_prob, last_dmg);
+    }
+
+    fn resolve_pending_actions(&mut self, current_branches: &mut StateMap<Branch>) {
+        while !self.next_actions.is_empty() {
+            mem::swap(current_branches, &mut self.next_actions);
+            #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
+            for (branch, probability) in current_branches.drain() {
+                self.resolve_action(branch, probability);
+            }
+        }
     }
 
     fn resolve_turn_order(&mut self, mut branch: Branch, mut probability: f64) {

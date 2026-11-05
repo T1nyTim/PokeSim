@@ -16,11 +16,21 @@ pub struct BattleKey {
 }
 
 impl BattleKey {
-    pub(crate) fn into_state(self) -> BattleState {
+    pub(crate) fn action_batch_order(&self) -> u64 {
+        let mut hasher = StateHasher::default();
+        self.player.hash_action_group(&mut hasher);
+        self.ai.hash_action_group(&mut hasher);
+        hasher.write_u64(self.pp_damage_and_items);
+        let group = hasher.finish() & (u64::from(u32::MAX) << u32::BITS);
+        let hp_mask = u64::from(u16::MAX);
+        (group + ((self.player.flags & hp_mask) << u16::BITS)) | (self.ai.flags & hp_mask)
+    }
+
+    pub(crate) fn to_state(&self) -> BattleState {
         let [pp1, pp2, pp3, pp4, dmg_low, dmg_high, ai_items_left, _] = self.pp_damage_and_items.to_le_bytes();
         BattleState::from_key(
-            self.player.into_state(),
-            self.ai.into_state(),
+            self.player.to_state(),
+            self.ai.to_state(),
             [pp1, pp2, pp3, pp4],
             u16::from_le_bytes([dmg_low, dmg_high]),
             ai_items_left,
@@ -103,11 +113,7 @@ impl Hash for CombatantKey {
     where
         H: Hasher,
     {
-        state.write_u64(self.flags);
-        state.write_u64(self.status);
-        if let Some(mv) = &self.trapping_mv {
-            mv.hash(state);
-        }
+        self.hash_fields(state, self.flags, self.status);
     }
 }
 
@@ -149,7 +155,20 @@ impl CombatantKey {
         }
     }
 
-    fn into_state(self) -> CombatantState {
+    fn hash_action_group(&self, state: &mut impl Hasher) {
+        let timer_mask = 0b111_1111 | (0b1111 << 10u8);
+        self.hash_fields(state, self.flags >> u16::BITS, self.status & !timer_mask);
+    }
+
+    fn hash_fields(&self, state: &mut impl Hasher, flags: u64, status: u64) {
+        state.write_u64(flags);
+        state.write_u64(status);
+        if let Some(mv) = &self.trapping_mv {
+            mv.hash(state);
+        }
+    }
+
+    fn to_state(&self) -> CombatantState {
         let [hp_low, hp_high, atk, def, spd, spc, acc, flags] = self.flags.to_le_bytes();
         let sleep = (self.status & 15) as u8;
         let confusion = ((self.status >> 4u64) & 7) as u8;
