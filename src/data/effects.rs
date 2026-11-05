@@ -14,8 +14,10 @@ pub enum Effect {
     AttackDownSide,
     AttackTwice,
     AttackUp1,
+    AttackUp2,
     Bide,
     BurnSide1,
+    BurnSide2,
     Charge,
     Confusion,
     ConfusionSide,
@@ -26,6 +28,7 @@ pub enum Effect {
     DefenseUp2,
     Disable,
     DrainHp,
+    DreamEater,
     EvasionUp,
     Explode,
     Flinch1,
@@ -34,15 +37,18 @@ pub enum Effect {
     FreezeSide,
     Haze,
     Heal,
+    HyperBeam,
     LeechSeed,
     LightScreen,
     Metronome,
+    Mimic,
     MirrorMove,
     #[expect(clippy::upper_case_acronyms, reason = "is an acronym")]
     OHKO,
     Paralyze,
     ParalyzeSide1,
     ParalyzeSide2,
+    PayDay,
     Poison,
     PoisonSide1,
     PoisonSide2,
@@ -51,12 +57,13 @@ pub enum Effect {
     Reflect,
     Sleep,
     SpecialDamage,
-    SpecialDown,
+    SpecialDownSide,
     SpecialUp1,
     SpecialUp2,
     SpeedDown,
     SpeedDownSide,
     SpeedUp,
+    Substitute,
     SuperFang,
     Swift,
     SwitchAndTeleport,
@@ -72,7 +79,7 @@ impl Effect {
             self,
             Self::AccuracyDown
                 | Self::AttackUp1
-                // | Self::AttackUp2
+                | Self::AttackUp2
                 | Self::AttackDown
                 // | Self::Conversion
                 | Self::DefenseDown1
@@ -83,7 +90,7 @@ impl Effect {
                 | Self::Haze
                 | Self::Heal
                 | Self::LightScreen
-                // | Self::PayDay
+                | Self::PayDay
                 | Self::Reflect
                 | Self::SpecialUp1
                 | Self::SpecialUp2
@@ -105,12 +112,14 @@ impl Effect {
         matches!(
             self,
             Self::BurnSide1
+                | Self::BurnSide2
                 | Self::FreezeSide
                 | Self::Paralyze
                 | Self::ParalyzeSide1
                 | Self::ParalyzeSide2
                 | Self::Poison
                 | Self::PoisonSide1
+                | Self::PoisonSide2
                 | Self::Sleep
         )
     }
@@ -125,9 +134,10 @@ impl Effect {
     pub(crate) const fn resolution(&self) -> EffectResolution {
         match *self {
             Self::Bide => EffectResolution::Bide,
-            Self::MirrorMove => EffectResolution::CopyMove,
+            Self::Mimic | Self::MirrorMove => EffectResolution::CopyMove,
             Self::AttackDownSide
             | Self::BurnSide1
+            | Self::BurnSide2
             | Self::Charge
             | Self::ConfusionSide
             | Self::DefenseDownSide
@@ -137,10 +147,12 @@ impl Effect {
             | Self::NoEffect
             | Self::ParalyzeSide1
             | Self::ParalyzeSide2
+            | Self::PayDay
             | Self::PoisonSide1
             | Self::PoisonSide2
             | Self::Rage
             | Self::Recoil
+            | Self::SpecialDownSide
             | Self::SpeedDownSide
             | Self::Swift
             | Self::Trapping
@@ -152,6 +164,7 @@ impl Effect {
             Self::AccuracyDown
             | Self::AttackDown
             | Self::AttackUp1
+            | Self::AttackUp2
             | Self::Confusion
             | Self::DefenseDown1
             | Self::DefenseDown2
@@ -161,33 +174,52 @@ impl Effect {
             | Self::LeechSeed
             | Self::Paralyze
             | Self::Poison
-            | Self::SpecialDown
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedUp => EffectResolution::Status,
             Self::SwitchAndTeleport => EffectResolution::SwitchOrEscape,
             Self::AttackTwice
+            | Self::DreamEater
             | Self::EvasionUp
             | Self::Explode
             | Self::FreezeSide
             | Self::Haze
             | Self::Heal
+            | Self::HyperBeam
             | Self::LightScreen
             | Self::Metronome
             | Self::OHKO
             | Self::Reflect
+            | Self::Substitute
             | Self::ThrashPetalDance => todo!(),
         }
     }
 
     pub(crate) const fn targets_user(&self) -> bool {
-        matches!(self, Self::Bide | Self::DefenseUp1 | Self::FocusEnergy | Self::SpecialUp1 | Self::SpeedUp)
+        matches!(
+            self,
+            Self::AttackUp1
+                | Self::AttackUp2
+                | Self::Bide
+                | Self::DefenseUp1
+                | Self::DefenseUp2
+                | Self::EvasionUp
+                | Self::FocusEnergy
+                | Self::Heal
+                | Self::LightScreen
+                | Self::Reflect
+                | Self::SpecialUp1
+                | Self::SpecialUp2
+                | Self::SpeedUp
+                | Self::Substitute
+        )
     }
 
     pub(crate) fn apply_primary(&self, target: &mut CombatantState, target_types: &[Type; 2]) {
         match self {
             Self::Confusion => target.confuse(),
+            Self::FocusEnergy => target.focus_energy = true,
             Self::LeechSeed => target.seed(target_types),
             Self::Paralyze => {
                 if target.can_be_paralyzed() {
@@ -204,8 +236,10 @@ impl Effect {
             | Self::AttackDown
             | Self::AttackTwice
             | Self::AttackUp1
+            | Self::AttackUp2
             | Self::Bide
             | Self::BurnSide1
+            | Self::BurnSide2
             | Self::Charge
             | Self::ConfusionSide
             | Self::DefenseDown1
@@ -215,21 +249,24 @@ impl Effect {
             | Self::DefenseUp2
             | Self::Disable
             | Self::DrainHp
+            | Self::DreamEater
             | Self::EvasionUp
             | Self::Explode
             | Self::Flinch1
             | Self::Flinch2
-            | Self::FocusEnergy
             | Self::FreezeSide
             | Self::Haze
             | Self::Heal
+            | Self::HyperBeam
             | Self::LightScreen
             | Self::Metronome
             | Self::MirrorMove
+            | Self::Mimic
             | Self::NoEffect
             | Self::OHKO
             | Self::ParalyzeSide1
             | Self::ParalyzeSide2
+            | Self::PayDay
             | Self::PoisonSide1
             | Self::PoisonSide2
             | Self::Rage
@@ -237,12 +274,13 @@ impl Effect {
             | Self::Reflect
             | Self::Sleep
             | Self::SpecialDamage
-            | Self::SpecialDown
+            | Self::SpecialDownSide
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedDownSide
             | Self::SpeedUp
+            | Self::Substitute
             | Self::SuperFang
             | Self::Swift
             | Self::SwitchAndTeleport
@@ -255,8 +293,8 @@ impl Effect {
 
     pub(crate) fn apply_secondary(&self, target: &mut CombatantState) {
         match *self {
-            Self::AttackDownSide | Self::DefenseDownSide | Self::SpeedDownSide => self.apply_status(&mut target.stages),
-            Self::BurnSide1 => target.burn(),
+            Self::AttackDownSide | Self::DefenseDownSide | Self::SpecialDownSide | Self::SpeedDownSide => self.apply_status(&mut target.stages),
+            Self::BurnSide1 | Self::BurnSide2 => target.burn(),
             Self::ConfusionSide => target.confuse(),
             Self::ParalyzeSide1 | Self::ParalyzeSide2 => target.paralyze(),
             Self::PoisonSide1 | Self::PoisonSide2 => target.poison(),
@@ -265,6 +303,7 @@ impl Effect {
             | Self::AttackDown
             | Self::AttackTwice
             | Self::AttackUp1
+            | Self::AttackUp2
             | Self::Bide
             | Self::Charge
             | Self::Confusion
@@ -274,6 +313,7 @@ impl Effect {
             | Self::DefenseUp2
             | Self::Disable
             | Self::DrainHp
+            | Self::DreamEater
             | Self::EvasionUp
             | Self::Explode
             | Self::Flinch1
@@ -282,23 +322,26 @@ impl Effect {
             | Self::FreezeSide
             | Self::Haze
             | Self::Heal
+            | Self::HyperBeam
             | Self::LeechSeed
             | Self::LightScreen
             | Self::Metronome
+            | Self::Mimic
             | Self::MirrorMove
             | Self::OHKO
             | Self::Paralyze
+            | Self::PayDay
             | Self::Poison
             | Self::Rage
             | Self::Recoil
             | Self::Reflect
             | Self::Sleep
             | Self::SpecialDamage
-            | Self::SpecialDown
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedUp
+            | Self::Substitute
             | Self::SuperFang
             | Self::Swift
             | Self::SwitchAndTeleport
@@ -312,25 +355,27 @@ impl Effect {
     pub(crate) fn apply_status(&self, stages: &mut StatStages) {
         match *self {
             Self::AccuracyDown => stages.acc = (stages.acc - 1).max(-6),
-            Self::AttackDown => stages.atk = (stages.atk - 1).max(-6),
-            Self::AttackUp1 => stages.atk = (stages.atk + 1).max(6),
+            Self::AttackDown | Self::AttackDownSide => stages.atk = (stages.atk - 1).max(-6),
+            Self::AttackUp1 => stages.atk = (stages.atk + 1).min(6),
+            Self::AttackUp2 => stages.atk = (stages.atk + 2).min(6),
             Self::DefenseDown1 | Self::DefenseDownSide => stages.def = (stages.def - 1).max(-6),
             Self::DefenseDown2 => stages.def = (stages.def - 2).max(-6),
             Self::DefenseUp1 => stages.def = (stages.def + 1).min(6),
             Self::DefenseUp2 => stages.def = (stages.def + 2).min(6),
-            Self::SpecialDown => stages.spc = (stages.spc - 1).max(-6),
+            Self::SpecialDownSide => stages.spc = (stages.spc - 1).max(-6),
             Self::SpecialUp1 => stages.spc = (stages.spc + 1).min(6),
             Self::SpecialUp2 => stages.spc = (stages.spc + 2).min(6),
             Self::SpeedDown | Self::SpeedDownSide => stages.spd = (stages.spd - 1).max(-6),
-            Self::AttackDownSide
-            | Self::AttackTwice
+            Self::AttackTwice
             | Self::Bide
             | Self::BurnSide1
+            | Self::BurnSide2
             | Self::Charge
             | Self::Confusion
             | Self::ConfusionSide
             | Self::Disable
             | Self::DrainHp
+            | Self::DreamEater
             | Self::EvasionUp
             | Self::Explode
             | Self::Flinch1
@@ -339,15 +384,18 @@ impl Effect {
             | Self::FreezeSide
             | Self::Haze
             | Self::Heal
+            | Self::HyperBeam
             | Self::LeechSeed
             | Self::LightScreen
             | Self::Metronome
+            | Self::Mimic
             | Self::MirrorMove
             | Self::NoEffect
             | Self::OHKO
             | Self::Paralyze
             | Self::ParalyzeSide1
             | Self::ParalyzeSide2
+            | Self::PayDay
             | Self::Poison
             | Self::PoisonSide1
             | Self::PoisonSide2
@@ -357,6 +405,7 @@ impl Effect {
             | Self::Sleep
             | Self::SpecialDamage
             | Self::SpeedUp
+            | Self::Substitute
             | Self::SuperFang
             | Self::Swift
             | Self::SwitchAndTeleport
@@ -394,7 +443,7 @@ impl Effect {
     }
 
     pub(crate) fn drained_hp(&self, dmg_dealt: u16) -> u16 {
-        if dmg_dealt > 0 && matches!(self, Self::DrainHp) {
+        if dmg_dealt > 0 && matches!(self, Self::DrainHp | Self::DreamEater) {
             (dmg_dealt / 2).max(1)
         } else {
             0
@@ -425,8 +474,10 @@ impl Effect {
             | Self::AttackDown
             | Self::AttackTwice
             | Self::AttackUp1
+            | Self::AttackUp2
             | Self::Bide
             | Self::BurnSide1
+            | Self::BurnSide2
             | Self::Charge
             | Self::ConfusionSide
             | Self::DefenseDown1
@@ -435,6 +486,7 @@ impl Effect {
             | Self::DefenseUp1
             | Self::DefenseUp2
             | Self::DrainHp
+            | Self::DreamEater
             | Self::EvasionUp
             | Self::Explode
             | Self::Flinch1
@@ -443,15 +495,18 @@ impl Effect {
             | Self::FreezeSide
             | Self::Haze
             | Self::Heal
+            | Self::HyperBeam
             | Self::LeechSeed
             | Self::LightScreen
             | Self::Metronome
+            | Self::Mimic
             | Self::MirrorMove
             | Self::OHKO
             | Self::NoEffect
             | Self::Paralyze
             | Self::ParalyzeSide1
             | Self::ParalyzeSide2
+            | Self::PayDay
             | Self::Poison
             | Self::PoisonSide1
             | Self::PoisonSide2
@@ -459,12 +514,13 @@ impl Effect {
             | Self::Recoil
             | Self::Reflect
             | Self::SpecialDamage
-            | Self::SpecialDown
+            | Self::SpecialDownSide
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedDownSide
             | Self::SpeedUp
+            | Self::Substitute
             | Self::SuperFang
             | Self::Swift
             | Self::SwitchAndTeleport
@@ -477,7 +533,7 @@ impl Effect {
 
     pub(crate) fn hit_probability(&self, probability: f64, is_ai: bool) -> f64 {
         match *self {
-            Self::AccuracyDown | Self::AttackDown | Self::DefenseDown1 | Self::DefenseDown2 | Self::SpecialDown | Self::SpeedDown => {
+            Self::AccuracyDown | Self::AttackDown | Self::DefenseDown1 | Self::DefenseDown2 | Self::SpeedDown => {
                 if is_ai {
                     probability * 0.75
                 } else {
@@ -486,47 +542,61 @@ impl Effect {
             }
             Self::AttackDownSide
             | Self::BurnSide1
+            | Self::BurnSide2
             | Self::Confusion
             | Self::ConfusionSide
             | Self::DefenseDownSide
             | Self::Disable
             | Self::DrainHp
+            | Self::DreamEater
+            | Self::Explode
             | Self::Flinch1
             | Self::Flinch2
+            | Self::FreezeSide
+            | Self::HyperBeam
             | Self::LeechSeed
+            | Self::Mimic
             | Self::NoEffect
             | Self::Paralyze
             | Self::ParalyzeSide1
             | Self::ParalyzeSide2
+            | Self::PayDay
             | Self::Poison
             | Self::PoisonSide1
             | Self::PoisonSide2
             | Self::Recoil
             | Self::Sleep
+            | Self::SpecialDamage
+            | Self::SpecialDownSide
             | Self::SpeedDownSide
+            | Self::SuperFang
             | Self::Trapping
             | Self::TwoToFiveAttacks => probability,
             Self::AttackTwice
             | Self::Charge
-            | Self::EvasionUp
-            | Self::Explode
-            | Self::FocusEnergy
-            | Self::FreezeSide
             | Self::Haze
-            | Self::Heal
-            | Self::LightScreen
             | Self::Metronome
             | Self::MirrorMove
             | Self::OHKO
             | Self::Rage
-            | Self::Reflect
-            | Self::SpecialDamage
             | Self::SpeedUp
-            | Self::SuperFang
-            | Self::Swift
             | Self::ThrashPetalDance
             | Self::Twineedle => todo!(),
-            Self::AttackUp1 | Self::Bide | Self::DefenseUp1 | Self::DefenseUp2 | Self::SpecialUp1 | Self::SpecialUp2 | Self::SwitchAndTeleport => 1.0,
+            Self::AttackUp1
+            | Self::AttackUp2
+            | Self::Bide
+            | Self::DefenseUp1
+            | Self::DefenseUp2
+            | Self::EvasionUp
+            | Self::FocusEnergy
+            | Self::Heal
+            | Self::LightScreen
+            | Self::Reflect
+            | Self::SpecialUp1
+            | Self::SpecialUp2
+            | Self::Substitute
+            | Self::Swift
+            | Self::SwitchAndTeleport => 1.0,
         }
     }
 
@@ -540,6 +610,7 @@ impl Effect {
                 if is_ai { probability * 0.75 } else { probability }
             }
             Self::BurnSide1 if target.can_be_burned(target_types) => 26.0 / 256.0,
+            Self::BurnSide2 if target.can_be_burned(target_types) => 77.0 / 256.0,
             Self::ConfusionSide if target.can_be_confused() => 25.0 / 256.0,
             Self::DefenseDownSide if target.stages.def > -6 => {
                 let probability = 85.0 / 256.0;
@@ -557,6 +628,10 @@ impl Effect {
                 }
             }
             Self::PoisonSide1 | Self::PoisonSide2 if target.can_be_poisoned(target_types) => self.poison_probability(),
+            Self::SpecialDownSide if target.stages.spc > -6 => {
+                let probability = 85.0 / 256.0;
+                if is_ai { probability * 0.75 } else { probability }
+            }
             Self::SpeedDownSide if target.stages.spd > -6 => {
                 let probability = 85.0 / 256.0;
                 if is_ai { probability * 0.75 } else { probability }
@@ -566,8 +641,10 @@ impl Effect {
             | Self::AttackDownSide
             | Self::AttackTwice
             | Self::AttackUp1
+            | Self::AttackUp2
             | Self::Bide
             | Self::BurnSide1
+            | Self::BurnSide2
             | Self::Charge
             | Self::Confusion
             | Self::ConfusionSide
@@ -578,21 +655,25 @@ impl Effect {
             | Self::DefenseUp2
             | Self::Disable
             | Self::DrainHp
+            | Self::DreamEater
             | Self::EvasionUp
             | Self::Explode
             | Self::FocusEnergy
             | Self::FreezeSide
             | Self::Haze
             | Self::Heal
+            | Self::HyperBeam
             | Self::LeechSeed
             | Self::LightScreen
             | Self::Metronome
+            | Self::Mimic
             | Self::MirrorMove
             | Self::NoEffect
             | Self::OHKO
             | Self::Paralyze
             | Self::ParalyzeSide1
             | Self::ParalyzeSide2
+            | Self::PayDay
             | Self::Poison
             | Self::PoisonSide1
             | Self::PoisonSide2
@@ -601,12 +682,13 @@ impl Effect {
             | Self::Reflect
             | Self::Sleep
             | Self::SpecialDamage
-            | Self::SpecialDown
+            | Self::SpecialDownSide
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedDownSide
             | Self::SpeedUp
+            | Self::Substitute
             | Self::SuperFang
             | Self::Swift
             | Self::SwitchAndTeleport

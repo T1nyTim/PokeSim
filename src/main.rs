@@ -9,10 +9,14 @@ use std::time::Instant;
 
 use crate::{
     battle::Battle,
-    data::{Item, species::BULBASAUR},
+    data::{
+        Item,
+        moves::{BIDE, BODY_SLAM, BUBBLEBEAM, DIG, MEGA_PUNCH, SEISMIC_TOSS, THUNDER_WAVE, WATER_GUN, WHIRLWIND},
+        species::BULBASAUR,
+    },
     journey::{
-        BROCK, BUG_CATCHER, HIKER, JR_TRAINER_F, JR_TRAINER_M, JourneyStep, LASS, MISTY, MatchupGroup, PlayerPolicy, RIVAL1, ROCKET, SUPER_NERD,
-        SWIMMER, YOUNGSTER,
+        BROCK, BUG_CATCHER, GENTLEMAN, HIKER, JR_TRAINER_F, JR_TRAINER_M, JourneyStep, LASS, MISTY, MatchupGroup, PlayerPolicy, RIVAL1, ROCKET,
+        SAILOR, SUPER_NERD, SWIMMER, YOUNGSTER,
     },
     player::Player,
     pokemon::{Dvs, Pokemon, data::*},
@@ -46,6 +50,7 @@ fn main() {
         JourneyStep::Matchup(MatchupGroup::new_wild(&WEEDLE_WILD_L3)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&DIGLETT_TRAINER_L11, &SANDSHREW_TRAINER_L11], JR_TRAINER_M).with_encounter_depth(1, 47)),
         JourneyStep::Matchup(MatchupGroup::new_boss(vec![&GEODUDE_TRAINER_L12, &ONIX_BROCK_L14], BROCK)),
+        JourneyStep::Item(Item::Tm(&BIDE)),
         JourneyStep::Matchup(
             MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L9, &PIDGEY_TRAINER_L9], LASS).with_encounter_depth(0, 55).with_encounter_depth(1, 54)
         ),
@@ -59,6 +64,7 @@ fn main() {
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&CATERPIE_TRAINER_L11, &METAPOD_TRAINER_L11], BUG_CATCHER)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&JIGGLYPUFF_TRAINER_L14], LASS).with_encounter_depth(0, 25)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L8)),
+        JourneyStep::Item(Item::Tm(&WATER_GUN)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L7)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&WEEDLE_TRAINER_L11, &KAKUNA_TRAINER_L11], BUG_CATCHER)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L9)),
@@ -68,7 +74,7 @@ fn main() {
         JourneyStep::Item(Item::HpUp),
         JourneyStep::Matchup(MatchupGroup::new_wild(&GEODUDE_WILD_L9)),
         JourneyStep::Matchup(
-            MatchupGroup::new_trainer(vec![&SANDSHREW_TRAINER_L11, &RATTATA_TRAINER_L11, &ZUBAT_TRAINER_L11], ROCKET).with_encounter_depth(0, 52)
+            MatchupGroup::new_trainer(vec![&SANDSHREW_TRAINER_L11, &RATTATA_TRAINER_L11, &ZUBAT_TRAINER_L11], ROCKET).with_encounter_depth(0, 61)
         ),
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L7)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&GEODUDE_WILD_L8)),
@@ -81,6 +87,7 @@ fn main() {
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L8)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L10)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&ZUBAT_TRAINER_L12, &EKANS_TRAINER_L12], ROCKET).with_encounter_depth(1, 31)),
+        JourneyStep::Item(Item::Tm(&MEGA_PUNCH)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&GEODUDE_WILD_L7)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L10, &RATTATA_TRAINER_L10, &ZUBAT_TRAINER_L10], YOUNGSTER)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L7)),
@@ -95,22 +102,25 @@ fn main() {
         JourneyStep::Matchup(MatchupGroup::new_wild(&ZUBAT_WILD_L9)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&GRIMER_TRAINER_L12, &VOLTORB_TRAINER_L12, &KOFFING_TRAINER_L12], SUPER_NERD)),
         JourneyStep::Matchup(MatchupGroup::new_wild(&GEODUDE_WILD_L9)),
+        JourneyStep::Item(Item::Tm(&WHIRLWIND)),
         JourneyStep::Item(Item::RareCandy),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&HORSEA_TRAINER_L16, &SHELLDER_TRAINER_L16], SWIMMER)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&GOLDEEN_TRAINER_L19], JR_TRAINER_F)),
         JourneyStep::Matchup(MatchupGroup::new_boss(vec![&STARYU_TRAINER_L18, &STARMIE_MISTY_L21], MISTY).with_item(&Item::XDefend, 0.25, 1)),
+        JourneyStep::Item(Item::Tm(&BUBBLEBEAM)),
         JourneyStep::Matchup(
             MatchupGroup::new_boss(vec![&PIDGEOTTO_TRAINER_L18, &ABRA_TRAINER_L15, &RATTATA_TRAINER_L15, &CHARMANDER_TRAINER_L17], RIVAL1)
                 .with_encounter_depth(0, 42)
                 .with_encounter_depth(3, 16)
         ),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&CATERPIE_TRAINER_L14, &WEEDLE_TRAINER_L14], BUG_CATCHER)),
-        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L14, &NIDORANF_TRAINER_L14], LASS).with_encounter_depth(0, 39)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L14, &NIDORANF_TRAINER_L14], LASS).with_encounter_depth(0, 46)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L14, &EKANS_TRAINER_L14, &ZUBAT_TRAINER_L14], YOUNGSTER)),
-        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L16, &NIDORANF_TRAINER_L16], LASS).with_encounter_depth(0, 39)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L16, &NIDORANF_TRAINER_L16], LASS).with_encounter_depth(0, 48)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&MANKEY_TRAINER_L18], JR_TRAINER_M)),
-        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&EKANS_TRAINER_L15, &ZUBAT_TRAINER_L15], ROCKET).with_encounter_depth(0, 22)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&EKANS_TRAINER_L15, &ZUBAT_TRAINER_L15], ROCKET).with_encounter_depth(0, 27)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L14, &EKANS_TRAINER_L14], JR_TRAINER_M)),
+        JourneyStep::Item(Item::Tm(&THUNDER_WAVE)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&MACHOP_TRAINER_L15, &GEODUDE_TRAINER_L15], HIKER)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L15, &SPEAROW_TRAINER_L15], YOUNGSTER)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&ONIX_TRAINER_L17], HIKER)),
@@ -119,22 +129,51 @@ fn main() {
         JourneyStep::Matchup(
             MatchupGroup::new_trainer(vec![&GEODUDE_TRAINER_L13, &GEODUDE_TRAINER_L13, &MACHOP_TRAINER_L13, &GEODUDE_TRAINER_L13], HIKER)
         ),
-        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L14, &EKANS_TRAINER_L14], JR_TRAINER_M).with_encounter_depth(1, 23)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L14, &EKANS_TRAINER_L14], JR_TRAINER_M).with_encounter_depth(1, 25)),
+        JourneyStep::Item(Item::Tm(&SEISMIC_TOSS)),
         JourneyStep::Matchup(
             MatchupGroup::new_trainer(vec![&EKANS_TRAINER_L14, &SANDSHREW_TRAINER_L14], YOUNGSTER)
-                .with_encounter_depth(0, 23)
-                .with_encounter_depth(1, 28)
+                .with_encounter_depth(0, 25)
+                .with_encounter_depth(1, 37)
         ),
         JourneyStep::Matchup(
-            MatchupGroup::new_trainer(vec![&ODDISH_TRAINER_L13, &PIDGEY_TRAINER_L13, &ODDISH_TRAINER_L13], LASS).with_encounter_depth(1, 27)
+            MatchupGroup::new_trainer(vec![&ODDISH_TRAINER_L13, &PIDGEY_TRAINER_L13, &ODDISH_TRAINER_L13], LASS).with_encounter_depth(1, 36)
         ),
-        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&MACHOP_TRAINER_L17, &DROWZEE_TRAINER_L17], ROCKET).with_encounter_depth(1, 19)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&MACHOP_TRAINER_L17, &DROWZEE_TRAINER_L17], ROCKET)),
+        JourneyStep::Item(Item::Tm(&DIG)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&WEEDLE_TRAINER_L16, &CATERPIE_TRAINER_L16, &WEEDLE_TRAINER_L16], BUG_CATCHER)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&SQUIRTLE_TRAINER_L20], JR_TRAINER_M)),
         JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L16, &PIKACHU_TRAINER_L16], JR_TRAINER_F)),
-        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&BUTTERFREE_TRAINER_L20], BUG_CATCHER)),
-        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L16, &PIDGEY_TRAINER_L16, &PIDGEY_TRAINER_L16], JR_TRAINER_F)),
-        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&SPEAROW_TRAINER_L16, &RATICATE_TRAINER_L16], JR_TRAINER_M)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&BUTTERFREE_TRAINER_L20], BUG_CATCHER)),
+        JourneyStep::Matchup(
+            MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L16, &PIDGEY_TRAINER_L16, &PIDGEY_TRAINER_L16], JR_TRAINER_F)
+                .with_encounter_depth(0, 27)
+                .with_encounter_depth(1, 27)
+                .with_encounter_depth(2, 27)
+        ),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&SPEAROW_TRAINER_L16, &RATICATE_TRAINER_L16], JR_TRAINER_M)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&PIDGEY_TRAINER_L18, &NIDORANF_TRAINER_L18], LASS).with_encounter_depth(0, 26)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&NIDORANM_TRAINER_L21], YOUNGSTER)),
+        JourneyStep::Item(Item::Tm(&BODY_SLAM)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&NIDORANM_TRAINER_L19, &NIDORANF_TRAINER_L19], GENTLEMAN)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&GROWLITHE_TRAINER_L18, &GROWLITHE_TRAINER_L18], GENTLEMAN)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&SHELLDER_TRAINER_L21], SAILOR)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&HORSEA_TRAINER_L17, &SHELLDER_TRAINER_L17, &TENTACOOL_TRAINER_L17], SAILOR)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&HORSEA_TRAINER_L17, &HORSEA_TRAINER_L17, &HORSEA_TRAINER_L17], SAILOR)),
+        JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&TENTACOOL_TRAINER_L18, &STARYU_TRAINER_L18], SAILOR)),
+        // JourneyStep::Item(Item::Tm(&REST)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&TENTACOOL_TRAINER_L17, &STARYU_TRAINER_L17, &SHELLDER_TRAINER_L17], FISHERMAN)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&MACHOP_TRAINER_L20], SAILOR)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&MACHOP_TRAINER_L17, &TENTACOOL_TRAINER_L17], SAILOR)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&MACHOP_TRAINER_L18, &SHELLDER_TRAINER_L18], SAILOR)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&GOLDEEN_TRAINER_L17, &TENTACOOL_TRAINER_L17, &GOLDEEN_TRAINER_L17], FISHERMAN)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&PIKACHU_TRAINER_L23], GENTLEMAN)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&GROWLITHE_TRAINER_L17, &PONYTA_TRAINER_L17], GENTLEMAN)),
+        // JourneyStep::Matchup(MatchupGroup::new_trainer(vec![&RATTATA_TRAINER_L18, &PIKACHU_TRAINER_L18], LASS)),
+        // Rare Candy
+        // JourneyStep::Matchup(
+        //     MatchupGroup::new_boss(vec![&PIDGEOTTO_TRAINER_L19, &RATICATE_TRAINER_L16, &KADABRA_TRAINER_L18, &CHARMELEON_TRAINER_L20], RIVAL2)
+        // ),
     ];
     let mut win_rates = WinRates::default();
     let mut count = 0u8;

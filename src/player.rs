@@ -63,11 +63,16 @@ impl Player {
                 self.finish_matchup();
                 true
             }
+            Item::Tm(mv) => self.active.learn_tm(mv, &self.policy, &self.stat_exp),
             Item::XDefend => false,
-            Item::LeafStone | Item::MoonStone | Item::ThunderStone | Item::WaterStone => todo!(),
+            Item::FireStone | Item::LeafStone | Item::MoonStone | Item::ThunderStone | Item::WaterStone => todo!(),
         };
         if used {
-            println!("Used: {}", item.name());
+            if matches!(item, Item::Tm(_)) {
+                println!("Used TM: {}", item.name());
+            } else {
+                println!("Used: {}", item.name());
+            }
         }
         used
     }

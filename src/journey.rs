@@ -5,17 +5,49 @@ use crate::{
     pokemon::Pokemon,
 };
 
+// pub const AGATHA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const BEAUTY: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const BIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const BIRD_KEEPER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const BLACKBELT: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const BLAINE: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const BROCK: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const BRUNO: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const BUG_CATCHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const BURGLAR: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const CHANNELER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const COOLTRAINER_F: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const COOLTRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const CUE_BALL: &[AiPolicy] = &[];
+// pub const ENGINEER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const ERIKA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const FISHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const GAMBLER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const GENTLEMAN: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
+// pub const GIOVANNI: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const HIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const JR_TRAINER_F: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const JR_TRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const JUGGLER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const KOGA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const LANCE: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const LASS: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const LORELEI: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect, AiPolicy::TypeEffectiveness];
+// pub const LT_SURGE: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const MISTY: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const POKEMANIC: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect, AiPolicy::TypeEffectiveness];
+// pub const PSYCHIC: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
 pub const RIVAL1: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const RIVAL2: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const RIVAL3: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const ROCKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const ROCKET: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+// pub const SABRINA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+pub const SAILOR: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const SCIENTIST: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
 pub const SUPER_NERD: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
 pub const SWIMMER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+// pub const TAMER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const YOUNGSTER: &[AiPolicy] = &[];
 
 pub enum AiPolicy {

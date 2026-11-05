@@ -83,17 +83,18 @@ impl Pokemon {
     pub(super) fn learn_level_up_moves(&mut self, policy: &PlayerPolicy, stat_exp: &StatExp) {
         let stats = Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, stat_exp);
         for &(level, mv) in self.species.evo_moves {
-            if level != self.level || self.moves.contains(&Some(mv)) {
-                continue;
-            }
-            if let Some(slot) = policy.learn(&self.moves, mv, |candidate| self.expected_neutral_damage(&stats, candidate)) {
-                if let Some(forgotten) = self.moves[slot] {
-                    println!("Forgot: {}", forgotten.name());
-                }
-                self.moves[slot] = Some(mv);
-                println!("Learnt: {}", mv.name());
+            if level == self.level {
+                self.learn_move(mv, policy, &stats);
             }
         }
+    }
+
+    pub(super) fn learn_tm(&mut self, mv: &'static Move, policy: &PlayerPolicy, stat_exp: &StatExp) -> bool {
+        if !self.species.can_learn_tm(mv) {
+            return false;
+        }
+        let stats = Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, stat_exp);
+        self.learn_move(mv, policy, &stats)
     }
 
     pub(super) fn level_up(&mut self, policy: &PlayerPolicy, stat_exp: &StatExp) {
@@ -135,7 +136,7 @@ impl Pokemon {
         } else {
             (u32::from(stats.atk), 72)
         };
-        let crit_prob = mv.crit_probability(self.base_stats().spd);
+        let crit_prob = mv.crit_probability(self.base_stats().spd, false);
         let mut expected_dmg = 0.0f64;
         for (crit, probability) in [(false, 1.0f64 - crit_prob), (true, crit_prob)] {
             let mut damage = self.base_damage(mv.power, attack, defense, crit);
@@ -156,6 +157,18 @@ impl Pokemon {
             .map(|&(hits, probabillity)| f64::from(hits) * probabillity)
             .sum();
         expected_dmg * expected_hits * hit_prob
+    }
+
+    fn learn_move(&mut self, mv: &'static Move, policy: &PlayerPolicy, stats: &Stats) -> bool {
+        let Some(slot) = policy.learn(&self.moves, mv, |candidate| self.expected_neutral_damage(stats, candidate)) else {
+            return false;
+        };
+        if let Some(forgotten) = self.moves[slot] {
+            println!("Forgot: {}", forgotten.name());
+        }
+        self.moves[slot] = Some(mv);
+        println!("Learnt: {}", mv.name());
+        true
     }
 }
 

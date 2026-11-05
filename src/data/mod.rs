@@ -44,11 +44,13 @@ impl GrowthRate {
 
 #[derive(Eq, PartialEq)]
 pub enum Item {
+    FireStone,
     HpUp,
     LeafStone,
     MoonStone,
     RareCandy,
     ThunderStone,
+    Tm(&'static Move),
     WaterStone,
     XDefend,
 }
@@ -56,18 +58,27 @@ pub enum Item {
 impl Item {
     pub(super) const fn battle_effect(&self) -> Option<&'static Effect> {
         match self {
-            Self::HpUp | Self::LeafStone | Self::MoonStone | Self::RareCandy | Self::ThunderStone | Self::WaterStone => None,
+            Self::FireStone
+            | Self::HpUp
+            | Self::LeafStone
+            | Self::MoonStone
+            | Self::RareCandy
+            | Self::ThunderStone
+            | Self::Tm(_)
+            | Self::WaterStone => None,
             Self::XDefend => Some(&Effect::DefenseUp1),
         }
     }
 
     pub(super) const fn name(&self) -> &'static str {
         match self {
+            Self::FireStone => "Fire Stone",
             Self::HpUp => "HP Up",
             Self::LeafStone => "Leaf Stone",
             Self::MoonStone => "Moon Stone",
             Self::RareCandy => "Rare Candy",
             Self::ThunderStone => "Thunder Stone",
+            Self::Tm(mv) => mv.name(),
             Self::WaterStone => "Water Stone",
             Self::XDefend => "X Defend",
         }
@@ -77,6 +88,7 @@ impl Item {
 pub enum SpeciesKind {
     Abra,
     Arbok,
+    Arcanine,
     Beedrill,
     Bellsprout,
     Blastoise,
@@ -101,6 +113,7 @@ pub enum SpeciesKind {
     Goldeen,
     Graveler,
     Grimer,
+    Growlithe,
     Horsea,
     Hypno,
     Ivysaur,
@@ -144,6 +157,8 @@ pub enum SpeciesKind {
     Squirtle,
     Starmie,
     Staryu,
+    Tentacool,
+    Tentacruel,
     Venusaur,
     Victreebel,
     Vileplume,
@@ -161,6 +176,7 @@ impl SpeciesKind {
         match *self {
             Self::Abra => "Abra",
             Self::Arbok => "Arbok",
+            Self::Arcanine => "Arcanine",
             Self::Beedrill => "Beedrill",
             Self::Bellsprout => "Bellsprout",
             Self::Blastoise => "Blastoise",
@@ -185,6 +201,7 @@ impl SpeciesKind {
             Self::Goldeen => "Goldeen",
             Self::Graveler => "Graveler",
             Self::Grimer => "Grimer",
+            Self::Growlithe => "Growlithe",
             Self::Horsea => "Horsea",
             Self::Hypno => "Hypno",
             Self::Ivysaur => "Ivysaur",
@@ -228,6 +245,8 @@ impl SpeciesKind {
             Self::Squirtle => "Squirtle",
             Self::Starmie => "Starmie",
             Self::Staryu => "Staryu",
+            Self::Tentacool => "Tentacool",
+            Self::Tentacruel => "Tentacruel",
             Self::Venusaur => "Venusaur",
             Self::Victreebel => "Victreebel",
             Self::Vileplume => "Vileplume",
@@ -245,7 +264,7 @@ impl SpeciesKind {
 #[derive(Eq, Hash, PartialEq)]
 pub enum Type {
     Bug,
-    // Dragon,
+    Dragon,
     Electric,
     Fighting,
     Fire,
@@ -267,7 +286,10 @@ impl Type {
     }
 
     pub(super) const fn is_special(&self) -> bool {
-        matches!(self, Self::Electric | Self::Fire | Self::Grass | Self::Ice | Self::Psychic | Self::Water) // Dragon
+        matches!(
+            self,
+            Self::Dragon | Self::Electric | Self::Fire | Self::Grass | Self::Ice | Self::Psychic | Self::Water
+        )
     }
 
     pub(super) fn ai_effectiveness(&self, targets: &[Self; 2]) -> u32 {
@@ -283,10 +305,12 @@ impl Type {
             (&Self::Bug, &Self::Psychic) => (3, 20),
             (&Self::Bug, &Self::Ghost) => (4, 5),
             (&Self::Bug, &Self::Poison) => (5, 20),
+            (&Self::Dragon, &Self::Dragon) => (0, 20),
             (&Self::Electric, &Self::Water) => (0, 20),
             (&Self::Electric, &Self::Electric | &Self::Grass) => (1, 5),
             (&Self::Electric, &Self::Ground) => (2, 0),
             (&Self::Electric, &Self::Flying) => (3, 20),
+            (&Self::Electric, &Self::Dragon) => (4, 5),
             (&Self::Fighting, &Self::Normal) => (0, 20),
             (&Self::Fighting, &Self::Poison | &Self::Flying | &Self::Psychic | &Self::Bug) => (1, 5),
             (&Self::Fighting, &Self::Rock | &Self::Ice) => (2, 20),
@@ -295,6 +319,7 @@ impl Type {
             (&Self::Fire, &Self::Fire | &Self::Water) => (1, 5),
             (&Self::Fire, &Self::Bug) => (2, 20),
             (&Self::Fire, &Self::Rock) => (3, 5),
+            (&Self::Fire, &Self::Dragon) => (4, 5),
             (&Self::Flying, &Self::Electric) => (0, 5),
             (&Self::Flying, &Self::Fighting | &Self::Bug | &Self::Grass) => (1, 20),
             (&Self::Flying, &Self::Rock) => (2, 5),
@@ -306,12 +331,14 @@ impl Type {
             (&Self::Grass, &Self::Bug | &Self::Poison) => (3, 5),
             (&Self::Grass, &Self::Rock) => (4, 20),
             (&Self::Grass, &Self::Flying) => (5, 5),
+            (&Self::Grass, &Self::Dragon) => (6, 5),
             (&Self::Ground, &Self::Flying) => (0, 0),
             (&Self::Ground, &Self::Fire | &Self::Electric) => (1, 20),
             (&Self::Ground, &Self::Grass | &Self::Bug) => (2, 5),
             (&Self::Ground, &Self::Rock | &Self::Poison) => (3, 20),
             (&Self::Ice, &Self::Ice | &Self::Water) => (0, 5),
             (&Self::Ice, &Self::Grass | &Self::Ground | &Self::Flying) => (1, 20),
+            (&Self::Ice, &Self::Dragon) => (2, 20),
             (&Self::Normal, &Self::Rock) => (0, 5),
             (&Self::Normal, &Self::Ghost) => (1, 0),
             (&Self::Poison, &Self::Grass) => (0, 20),
@@ -326,6 +353,7 @@ impl Type {
             (&Self::Water, &Self::Fire | &Self::Rock) => (0, 20),
             (&Self::Water, &Self::Water | &Self::Grass) => (1, 5),
             (&Self::Water, &Self::Ground) => (2, 20),
+            (&Self::Water, &Self::Dragon) => (3, 5),
             _ => (u8::MAX, 10),
         }
     }
@@ -352,6 +380,7 @@ pub struct Species {
     pub base_exp: u8,
     pub learnset: [Option<&'static Move>; 4],
     pub growth: GrowthRate,
+    tm_moves: &'static [&'static Move],
     evolution: &'static [(Evolve, &'static Self)],
     pub evo_moves: &'static [(u8, &'static Move)],
 }
@@ -365,6 +394,7 @@ impl Species {
         base_exp: u8,
         learnset: [Option<&'static Move>; 4],
         growth: GrowthRate,
+        tm_moves: &'static [&'static Move],
         evolution: &'static [(Evolve, &'static Self)],
         evo_moves: &'static [(u8, &'static Move)],
     ) -> Self {
@@ -375,6 +405,7 @@ impl Species {
             base_exp,
             learnset,
             growth,
+            tm_moves,
             evolution,
             evo_moves,
         }
@@ -382,6 +413,10 @@ impl Species {
 
     pub(super) const fn name(&self) -> &'static str {
         self.kind.as_str()
+    }
+
+    pub(super) fn can_learn_tm(&self, mv: &Move) -> bool {
+        self.tm_moves.contains(&mv)
     }
 
     pub(super) fn evolution_at(&self, level: u8) -> Option<&'static Self> {

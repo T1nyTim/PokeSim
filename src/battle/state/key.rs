@@ -119,7 +119,8 @@ impl CombatantKey {
             | (u8::from(combatant.bide.is_some()) << 2u8)
             | (u8::from(combatant.burned) << 3u8)
             | (u8::from(combatant.trapping.is_some()) << 4u8)
-            | (u8::from(combatant.paralyzed) << 5u8);
+            | (u8::from(combatant.paralyzed) << 5u8)
+            | (u8::from(combatant.focus_energy) << 6u8);
         let disabled = combatant.disabled.as_ref();
         let bide = combatant.bide.as_ref();
         let trapping = combatant.trapping.as_ref();
@@ -166,6 +167,7 @@ impl CombatantKey {
             flags & 8 != 0,
             (confusion != 7).then_some(confusion),
             (disabled_slot != 7).then_some(DisableState::from_key(disabled_slot, ((self.status >> 10) & 15) as u8)),
+            flags & 64 != 0,
             flags & 32 != 0,
             flags & 1 != 0,
             flags & 2 != 0,

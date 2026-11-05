@@ -34,7 +34,7 @@ impl<'battle> Combatant<'battle> {
         let (attack, defense) = Self::damage_stage_indices(state, target_state, mv);
         let outcomes = &cache.staged(state, mv).outcomes[attack][defense];
         outcomes.get_or_init(|| {
-            let crit_prob = self.crit_probability(mv);
+            let crit_prob = self.crit_probability(mv, state.focus_energy);
             let normal = self.damage_rolls(target, state, target_state, mv, false);
             let mut combined: Vec<_> = normal
                 .iter()
@@ -122,8 +122,8 @@ impl<'battle> Combatant<'battle> {
         ((attack + 6) as usize, (defense + 6) as usize)
     }
 
-    fn crit_probability(&self, mv: &Move) -> f64 {
-        mv.crit_probability(self.pokemon.base_stats().spd)
+    fn crit_probability(&self, mv: &Move, focus_energy: bool) -> f64 {
+        mv.crit_probability(self.pokemon.base_stats().spd, focus_energy)
     }
 
     fn calculate_damage_rolls(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move, crit: bool) -> Vec<(u16, f64)> {
@@ -185,7 +185,9 @@ impl<'battle> Combatant<'battle> {
 struct DamageRollCache {
     normal: StagedDamageCache,
     burned: OnceCell<Box<StagedDamageCache>>,
+    burned_focused: OnceCell<Box<StagedDamageCache>>,
     critical: OnceCell<Vec<(u16, f64)>>,
+    focused: OnceCell<Box<StagedDamageCache>>,
 }
 
 impl DamageRollCache {
@@ -193,15 +195,18 @@ impl DamageRollCache {
         Self {
             normal: StagedDamageCache::new(),
             burned: OnceCell::new(),
+            burned_focused: OnceCell::new(),
             critical: OnceCell::new(),
+            focused: OnceCell::new(),
         }
     }
 
     fn staged(&self, state: &CombatantState, mv: &Move) -> &StagedDamageCache {
-        if state.burned && !mv.mv_type.is_special() {
-            self.burned.get_or_init(|| Box::new(StagedDamageCache::new()))
-        } else {
-            &self.normal
+        match (state.burned && !mv.mv_type.is_special(), state.focus_energy) {
+            (false, false) => &self.normal,
+            (true, false) => self.burned.get_or_init(|| Box::new(StagedDamageCache::new())),
+            (false, true) => self.focused.get_or_init(|| Box::new(StagedDamageCache::new())),
+            (true, true) => self.burned_focused.get_or_init(|| Box::new(StagedDamageCache::new())),
         }
     }
 }
