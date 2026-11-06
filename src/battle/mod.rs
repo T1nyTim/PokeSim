@@ -4,7 +4,7 @@ mod turn;
 
 use core::{
     array,
-    mem::{self, take},
+    mem::{self},
 };
 
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
             BattleState,
             key::{BattleKey, StateMap},
         },
-        turn::{Branch, TurnAction, TurnContext},
+        turn::{Branch, PendingAction, TurnAction, TurnContext},
     },
     data::{
         effects::{Effect, EffectResolution},
@@ -34,8 +34,7 @@ pub enum Side {
 
 pub struct Battle<'battle> {
     states: StateMap<BattleKey>,
-    branches: StateMap<Branch>,
-    next_actions: StateMap<Branch>,
+    next_actions: StateMap<PendingAction>,
     player: Combatant<'battle>,
     player_policy: &'battle PlayerPolicy,
     ai: Combatant<'battle>,
@@ -52,7 +51,6 @@ impl<'battle> Battle<'battle> {
         let ai_combatant = Combatant::new(ai, ai.stats());
         Self {
             states: StateMap::default(),
-            branches: StateMap::default(),
             next_actions: StateMap::default(),
             player: player_combatant,
             player_policy: &player.policy,
@@ -74,7 +72,6 @@ impl<'battle> Battle<'battle> {
 
     pub(super) fn run(&mut self, max_depth: usize) -> BattleOutcome {
         self.states.clear();
-        self.branches.clear();
         self.next_actions.clear();
         self.remaining_turns = max_depth;
         self.outcome = BattleOutcome::default();
@@ -83,7 +80,6 @@ impl<'battle> Battle<'battle> {
         init_state.cap_surplus_pp(self.remaining_turns);
         self.states.insert(init_state.key(), 1.0f64);
         let mut current_states = StateMap::default();
-        let mut current_branches = take(&mut self.branches);
         let mut batch_turns = false;
         for idx in 0..max_depth {
             if self.states.is_empty() {
@@ -97,7 +93,7 @@ impl<'battle> Battle<'battle> {
                 #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
                 for (state_key, probability) in current_states.drain() {
                     self.start_state_turn(&state_key, probability, second_turn);
-                    self.resolve_pending_actions(&mut current_branches);
+                    self.resolve_pending_actions();
                 }
                 continue;
             }
@@ -110,11 +106,10 @@ impl<'battle> Battle<'battle> {
                 for &(_, state_key, probabillity) in batch {
                     self.start_state_turn(state_key, probabillity, second_turn);
                 }
-                self.resolve_pending_actions(&mut current_branches);
+                self.resolve_pending_actions();
             }
             current_states.clear();
         }
-        self.branches = current_branches;
         self.outcome.unresolved += self.states.values().copied().fold(0.0f64, |total, prob| total + prob);
         self.states.clear();
         self.outcome.clone()
@@ -134,11 +129,11 @@ impl<'battle> Battle<'battle> {
             for idx in 0..last {
                 let ((slot, mv), choice_prob) = self.ai_choices[choice_idx].moves[priority_idx][idx];
                 let mut alternative = branch.clone();
-                alternative.turn.actions[1] = Some(TurnAction::Move(slot, mv));
+                alternative.turn.actions[1] = Some(TurnAction::new(Some((slot, mv))));
                 self.begin_action(alternative, probability * choice_prob);
             }
             let ((slot, mv), choice_prob) = self.ai_choices[choice_idx].moves[priority_idx][last];
-            branch.turn.actions[1] = Some(TurnAction::Move(slot, mv));
+            branch.turn.actions[1] = Some(TurnAction::new(Some((slot, mv))));
             probability *= choice_prob;
         }
         let (slot, mv) = branch.turn.selected_move();
@@ -306,9 +301,9 @@ impl<'battle> Battle<'battle> {
             self.outcome.record(winner, probability);
             return;
         }
-        branch.turn.finish_action();
-        if branch.turn.actions.iter().any(Option::is_some) {
-            *self.next_actions.entry(branch).or_insert(0.0f64) += probability;
+        if let Some((next_side, action)) = branch.turn.next_action() {
+            let pending = PendingAction::new(&branch.state, next_side, action);
+            *self.next_actions.entry(pending).or_insert(0.0f64) += probability;
             return;
         }
         branch.state.finish_turn();
@@ -434,35 +429,18 @@ impl<'battle> Battle<'battle> {
         if probability == 0.0f64 {
             return;
         }
-        let cached_rolls = branch.turn.damage_outcomes(&branch.state, &self.player, &self.ai);
-        let mut single_hit_rolls = [(0, 0.0f64); 78];
-        let mut extended_rolls;
-        let rolls: &mut [(u16, f64)] = if cached_rolls.len() <= single_hit_rolls.len() {
-            &mut single_hit_rolls
+        let rolls = branch.turn.damage_outcomes(&branch.state, &self.player, &self.ai);
+        let target_hp = match branch.turn.side.expect("Damage resolution requires an acting side") {
+            Side::Player => branch.state.ai.hp,
+            Side::Ai => branch.state.player.hp,
+        };
+        let (&(max_dmg, max_prob), lower_rolls) = rolls.split_last().expect("A damaging move must produce at least one damage outcome");
+        let (alternatives, last_dmg, last_prob) = if max_dmg <= target_hp {
+            (lower_rolls, max_dmg, max_prob)
         } else {
-            extended_rolls = vec![(0, 0.0f64); cached_rolls.len()];
-            &mut extended_rolls
+            let (nonlethal, lethal) = rolls.split_at(rolls.partition_point(|&(damage, _)| damage < target_hp));
+            (nonlethal, target_hp, lethal.iter().map(|&(_, roll_prob)| roll_prob).sum::<f64>())
         };
-        let roll_count = {
-            let target_hp = match branch.turn.side.expect("Damage resolution requires an acting side") {
-                Side::Player => branch.state.ai.hp,
-                Side::Ai => branch.state.player.hp,
-            };
-            let mut count = 0;
-            for &(damage, roll_prob) in cached_rolls {
-                let dmg_dealt = damage.min(target_hp);
-                if count > 0 && rolls[count - 1].0 == dmg_dealt {
-                    rolls[count - 1].1 += roll_prob;
-                } else {
-                    rolls[count] = (dmg_dealt, roll_prob);
-                    count += 1;
-                }
-            }
-            count
-        };
-        let (&(last_dmg, last_prob), alternatives) = rolls[..roll_count]
-            .split_last()
-            .expect("A damaging move must produce at least once damage outcome");
         for &(dmg, roll_prob) in alternatives {
             let alternative = branch.clone();
             self.resolve_damage(alternative, probability * roll_prob, dmg);
@@ -470,14 +448,16 @@ impl<'battle> Battle<'battle> {
         self.resolve_damage(branch, probability * last_prob, last_dmg);
     }
 
-    fn resolve_pending_actions(&mut self, current_branches: &mut StateMap<Branch>) {
-        while !self.next_actions.is_empty() {
-            mem::swap(current_branches, &mut self.next_actions);
-            #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
-            for (branch, probability) in current_branches.drain() {
-                self.resolve_action(branch, probability);
-            }
+    fn resolve_pending_actions(&mut self) {
+        if self.next_actions.is_empty() {
+            return;
         }
+        let mut pending_actions = mem::take(&mut self.next_actions);
+        #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
+        for (pending, probability) in pending_actions.drain() {
+            self.resolve_action(pending.into_branch(), probability);
+        }
+        self.next_actions = pending_actions;
     }
 
     fn resolve_turn_order(&mut self, mut branch: Branch, mut probability: f64) {
@@ -523,7 +503,7 @@ impl<'battle> Battle<'battle> {
             TurnAction::Move(None, &BIDE)
         } else if let Some(slot) = state.ai.charging_slot {
             let idx = usize::from(slot);
-            TurnAction::Move(Some(idx), self.ai.pokemon.moves[idx].expect("A charging move must stilll be known"))
+            TurnAction::Move(Some(slot), self.ai.pokemon.moves[idx].expect("A charging move must stilll be known"))
         } else {
             let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2
                 + u8::from(state.player.has_status_condition())

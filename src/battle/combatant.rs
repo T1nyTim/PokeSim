@@ -1,6 +1,6 @@
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, rc::Rc};
 use core::{array, cell::OnceCell};
 use std::collections::HashMap;
 
@@ -10,8 +10,7 @@ use crate::{
     pokemon::{Pokemon, Stats},
 };
 
-type StagedDamageRolls = [[OnceCell<Vec<(u16, f64)>>; 13]; 13];
-type StagedExpectedDamage = [[OnceCell<Vec<f64>>; 13]; 13];
+pub(super) type DamageOutcomes = Rc<[(u16, f64)]>;
 
 pub struct Combatant<'battle> {
     pub pokemon: &'battle Pokemon,
@@ -29,11 +28,11 @@ impl<'battle> Combatant<'battle> {
         ) as u16
     }
 
-    pub(super) fn damage_outcomes(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> &[(u16, f64)] {
+    pub(super) fn damage_outcomes(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> DamageOutcomes {
         let cache = self.damage_rolls.get(mv).expect("A selected move must have a damage-roll cache");
         let (attack, defense) = Self::damage_stage_indices(state, target_state, mv);
         let outcomes = &cache.staged(state, mv).outcomes[attack][defense];
-        outcomes.get_or_init(|| {
+        let cached = outcomes.get_or_init(|| {
             let crit_prob = self.crit_probability(mv, state.focus_energy);
             let normal = self.damage_rolls(target, state, target_state, mv, false);
             let mut combined: Vec<_> = normal
@@ -60,8 +59,9 @@ impl<'battle> Combatant<'battle> {
                 }
                 return totals.into_iter().collect();
             }
-            combined
-        })
+            Rc::from(combined)
+        });
+        Rc::clone(cached)
     }
 
     pub(super) fn expected_damage(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> f64 {
@@ -186,6 +186,10 @@ impl<'battle> Combatant<'battle> {
     }
 }
 
+type StagedDamageRolls = [[OnceCell<Vec<(u16, f64)>>; 13]; 13];
+type StagedDamageOutcomes = [[OnceCell<DamageOutcomes>; 13]; 13];
+type StagedExpectedDamage = [[OnceCell<Vec<f64>>; 13]; 13];
+
 struct DamageRollCache {
     normal: StagedDamageCache,
     burned: OnceCell<Box<StagedDamageCache>>,
@@ -217,7 +221,7 @@ impl DamageRollCache {
 
 struct StagedDamageCache {
     normal: StagedDamageRolls,
-    outcomes: StagedDamageRolls,
+    outcomes: StagedDamageOutcomes,
     expected: StagedExpectedDamage,
 }
 

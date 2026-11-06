@@ -2,7 +2,7 @@
 use std::sync::LazyLock;
 
 use crate::{
-    data::{moves::{BIDE, BUBBLEBEAM}, species::*}, pokemon::{Dvs, Pokemon},
+    data::{moves::{BIDE, BUBBLEBEAM, THUNDERBOLT}, species::*}, pokemon::{Dvs, Pokemon},
 };
  
 pub static ABRA_TRAINER_L15: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&ABRA, Dvs::TRAINER, 15));
@@ -65,6 +65,7 @@ pub static MACHOP_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::fro
 pub static MACHOP_TRAINER_L20: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&MACHOP, Dvs::TRAINER, 20));
 pub static MAGNEMITE_TRAINER_L11: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&MAGNEMITE, Dvs::TRAINER, 11));
 pub static MAGNEMITE_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&MAGNEMITE, Dvs::TRAINER, 18));
+pub static MAGNEMITE_TRAINER_L20: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&MAGNEMITE, Dvs::TRAINER, 20));
 pub static MAGNEMITE_TRAINER_L21: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&MAGNEMITE, Dvs::TRAINER, 21));
 pub static MANKEY_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&MANKEY, Dvs::TRAINER, 18));
 pub static METAPOD_TRAINER_L8: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&METAPOD, Dvs::TRAINER, 8));
@@ -102,9 +103,11 @@ pub static PIDGEY_WILD_L2: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_sp
 pub static PIDGEY_WILD_L3: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&PIDGEY, Dvs::WILD, 3));
 pub static PIKACHU_TRAINER_L16: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&PIKACHU, Dvs::TRAINER, 16));
 pub static PIKACHU_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&PIKACHU, Dvs::TRAINER, 18));
+pub static PIKACHU_TRAINER_L21: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&PIKACHU, Dvs::TRAINER, 21));
 pub static PIKACHU_TRAINER_L23: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&PIKACHU, Dvs::TRAINER, 23));
 pub static POLIWAG_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&POLIWAG, Dvs::TRAINER, 18));
 pub static PONYTA_TRAINER_L17: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&PONYTA, Dvs::TRAINER, 17));
+pub static RAICHU_SURGE_L24: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&RAICHU, Dvs::TRAINER, 24).with_move(&THUNDERBOLT));
 pub static RATICATE_TRAINER_L16: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&RATICATE, Dvs::TRAINER, 16));
 pub static RATICATE_TRAINER_L17: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&RATICATE, Dvs::TRAINER, 17));
 pub static RATTATA_TRAINER_L10: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&RATTATA, Dvs::TRAINER, 10));
@@ -137,6 +140,8 @@ pub static TENTACOOL_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::
 pub static VOLTORB_TRAINER_L11: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&VOLTORB, Dvs::TRAINER, 11));
 pub static VOLTORB_TRAINER_L12: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&VOLTORB, Dvs::TRAINER, 12));
 pub static VOLTORB_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&VOLTORB, Dvs::TRAINER, 18));
+pub static VOLTORB_TRAINER_L20: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&VOLTORB, Dvs::TRAINER, 20));
+pub static VOLTORB_TRAINER_L21: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&VOLTORB, Dvs::TRAINER, 21));
 pub static VULPIX_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&VULPIX, Dvs::TRAINER, 18));
 pub static WEEDLE_TRAINER_L6: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&WEEDLE, Dvs::TRAINER, 6));
 pub static WEEDLE_TRAINER_L7: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&WEEDLE, Dvs::TRAINER, 7));
