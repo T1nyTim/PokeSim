@@ -74,6 +74,10 @@ pub enum Effect {
 }
 
 impl Effect {
+    pub(crate) const fn damage_per_turn(&self, damage: f64) -> f64 {
+        if matches!(self, Self::Charge) { damage * 0.5 } else { damage }
+    }
+
     pub(crate) const fn encouraged_by_ai(&self) -> bool {
         matches!(
             self,
@@ -134,11 +138,11 @@ impl Effect {
     pub(crate) const fn resolution(&self) -> EffectResolution {
         match *self {
             Self::Bide => EffectResolution::Bide,
+            Self::Charge => EffectResolution::Charge,
             Self::Mimic | Self::MirrorMove => EffectResolution::CopyMove,
             Self::AttackDownSide
             | Self::BurnSide1
             | Self::BurnSide2
-            | Self::Charge
             | Self::ConfusionSide
             | Self::DefenseDownSide
             | Self::DrainHp
@@ -543,6 +547,7 @@ impl Effect {
             Self::AttackDownSide
             | Self::BurnSide1
             | Self::BurnSide2
+            | Self::Charge
             | Self::Confusion
             | Self::ConfusionSide
             | Self::DefenseDownSide
@@ -573,7 +578,6 @@ impl Effect {
             | Self::Trapping
             | Self::TwoToFiveAttacks => probability,
             Self::AttackTwice
-            | Self::Charge
             | Self::Haze
             | Self::Metronome
             | Self::MirrorMove
@@ -720,6 +724,7 @@ impl Effect {
 
 pub enum EffectResolution {
     Bide,
+    Charge,
     CopyMove,
     Damage,
     Disable,

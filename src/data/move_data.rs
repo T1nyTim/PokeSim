@@ -110,6 +110,7 @@ pub enum MoveKind {
     Sonicboom,
     SpikeCannon,
     Spore,
+    Stomp,
     StringShot,
     Struggle,
     StunSpore,
@@ -249,6 +250,7 @@ impl MoveKind {
             Self::Sonicboom => "Sonicboom",
             Self::SpikeCannon => "Spike Cannon",
             Self::Spore => "Spore",
+            Self::Stomp => "Stomp",
             Self::StringShot => "String Shot",
             Self::Struggle => "Struggle",
             Self::StunSpore => "Stun Spore",
@@ -304,6 +306,10 @@ impl Hash for Move {
 impl Move {
     pub(crate) const fn accuracy(&self) -> u8 {
         (self.accuracy as u16 * 255 / 100) as u8
+    }
+
+    pub(crate) const fn fixed_damage(&self) -> Option<u16> {
+        if matches!(self.kind, MoveKind::Sonicboom) { Some(20) } else { None }
     }
 
     pub(crate) const fn name(&self) -> &'static str {

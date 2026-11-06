@@ -126,7 +126,8 @@ impl CombatantKey {
             | (u8::from(combatant.burned) << 3u8)
             | (u8::from(combatant.trapping.is_some()) << 4u8)
             | (u8::from(combatant.paralyzed) << 5u8)
-            | (u8::from(combatant.focus_energy) << 6u8);
+            | (u8::from(combatant.focus_energy) << 6u8)
+            | (u8::from(combatant.underground) << 7u8);
         let disabled = combatant.disabled.as_ref();
         let bide = combatant.bide.as_ref();
         let trapping = combatant.trapping.as_ref();
@@ -138,7 +139,8 @@ impl CombatantKey {
             | (u64::from(bide.map_or(0, |active| active.damage)) << 16u64)
             | (u64::from(trapping.map_or(0, |active| active.damage)) << 32u64)
             | (u64::from(trapping.map_or(0, |active| active.turns_elapsed)) << 48u64)
-            | (u64::from(trapping.is_some_and(|active| active.ends_this_turn)) << 51u64);
+            | (u64::from(trapping.is_some_and(|active| active.ends_this_turn)) << 51u64)
+            | (u64::from(combatant.charging_slot.map_or(0, |slot| slot + 1)) << 52u64);
         Self {
             flags: u64::from_le_bytes([
                 hp_low,
@@ -184,6 +186,7 @@ impl CombatantKey {
             ),
             (flags & 4 != 0).then_some(BideState::from_key(((self.status >> 14) & 3) as u8, (self.status >> 16) as u16)),
             flags & 8 != 0,
+            (((self.status >> 52) & 7) as u8).checked_sub(1),
             (confusion != 7).then_some(confusion),
             (disabled_slot != 7).then_some(DisableState::from_key(disabled_slot, ((self.status >> 10) & 15) as u8)),
             flags & 64 != 0,
@@ -199,6 +202,7 @@ impl CombatantKey {
                     self.status & (1 << 51u64) != 0,
                 )
             }),
+            flags & 128 != 0,
         )
     }
 }

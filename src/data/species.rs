@@ -384,6 +384,14 @@ pub const NIDORINO: Species = Species::new(
     &[(Evolve::Item(Item::MoonStone), &NIDOKING)],
     &[(8, &HORN_ATTACK), (14, &POISON_STING), (23, &FOCUS_ENERGY), (32, &FURY_ATTACK), (41, &HORN_DRILL), (50, &DOUBLE_KICK)]
 );
+pub const NINETALES: Species = Species::new(
+    SpeciesKind::Ninetales, BaseStats::new(73, 76, 75, 100, 100), [Type::Fire, Type::Fire], 178,
+    [Some(&EMBER), Some(&TAIL_WHIP), Some(&QUICK_ATTACK), Some(&ROAR)], GrowthRate::MediumFast,
+    &[&TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &HYPER_BEAM, &RAGE, &DIG, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &FIRE_BLAST, &SWIFT, &SKULL_BASH,
+        &REST, &SUBSTITUTE],
+    &[],
+    &[]
+);
 pub const ODDISH: Species = Species::new(
     SpeciesKind::Oddish, BaseStats::new(45, 50, 55, 30, 75), [Type::Grass, Type::Poison], 78,
     [Some(&ABSORB), None, None, None], GrowthRate::MediumSlow,
@@ -445,6 +453,39 @@ pub const PIKACHU: Species = Species::new(
     &[(Evolve::Item(Item::ThunderStone), &RAICHU)],
     &[(9, &THUNDER_WAVE), (16, &QUICK_ATTACK), (26, &SWIFT), (33, &AGILITY), (43, &THUNDER)]
 );
+pub const POLIWAG: Species = Species::new(
+    SpeciesKind::Poliwag, BaseStats::new(40, 50, 40, 90, 40), [Type::Water, Type::Water], 77,
+    [Some(&BUBBLE), None, None, None], GrowthRate::MediumSlow,
+    &[&TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &RAGE, &PSYCHIC, &MIMIC, &DOUBLE_TEAM, &BIDE,
+        &SKULL_BASH, &REST, &PSYWAVE, &SUBSTITUTE],
+    &[(Evolve::Level(25), &POLIWHIRL)],
+    &[(16, &HYPNOSIS), (19, &WATER_GUN), (25, &DOUBLESLAP), (31, &BODY_SLAM), (38, &AMNESIA), (45, &HYDRO_PUMP)]
+);
+pub const POLIWHIRL: Species = Species::new(
+    SpeciesKind::Poliwhirl, BaseStats::new(65, 65, 65, 90, 50), [Type::Water, Type::Water], 131,
+    [Some(&BUBBLE), Some(&HYPNOSIS), Some(&WATER_GUN), None], GrowthRate::MediumSlow,
+    &[&MEGA_PUNCH, &MEGA_KICK, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &SUBMISSION, &COUNTER,
+        &SEISMIC_TOSS, &RAGE, &EARTHQUAKE, &FISSURE, &PSYCHIC, &MIMIC, &DOUBLE_TEAM, &BIDE, &METRONOME, &SKULL_BASH, &REST, &PSYWAVE, &SUBSTITUTE],
+    &[(Evolve::Item(Item::WaterStone), &POLIWRATH)],
+    &[(16, &HYPNOSIS), (19, &WATER_GUN), (26, &DOUBLESLAP), (33, &BODY_SLAM), (41, &AMNESIA), (49, &HYDRO_PUMP)]
+);
+pub const POLIWRATH: Species = Species::new(
+    SpeciesKind::Poliwrath, BaseStats::new(90, 85, 95, 70, 70), [Type::Water, Type::Fighting], 185,
+    [Some(&HYPNOSIS), Some(&WATER_GUN), Some(&DOUBLESLAP), Some(&BODY_SLAM)], GrowthRate::MediumSlow,
+    &[&MEGA_PUNCH, &MEGA_KICK, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &HYPER_BEAM, &SUBMISSION,
+        &COUNTER, &SEISMIC_TOSS, &RAGE, &EARTHQUAKE, &FISSURE, &PSYCHIC, &MIMIC, &DOUBLE_TEAM, &BIDE, &METRONOME, &SKULL_BASH, &REST, &PSYWAVE,
+        &SUBSTITUTE],
+    &[],
+    &[(16, &HYPNOSIS), (19, &WATER_GUN)]
+);
+pub const PONYTA: Species = Species::new(
+    SpeciesKind::Ponyta, BaseStats::new(50, 85, 55, 90, 65), [Type::Fire, Type::Fire], 152,
+    [Some(&EMBER), None, None, None], GrowthRate::MediumFast,
+    &[&TOXIC, &HORN_DRILL, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &RAGE, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &FIRE_BLAST, &SWIFT, &SKULL_BASH, &REST,
+        &SUBSTITUTE],
+    &[(Evolve::Level(40), &RAPIDASH)],
+    &[(30, &TAIL_WHIP), (32, &STOMP), (35, &GROWL), (39, &FIRE_SPIN), (43, &TAKE_DOWN), (48, &AGILITY)]
+);
 pub const PRIMEAPE: Species = Species::new(
     SpeciesKind::Primeape, BaseStats::new(65, 105, 60, 95, 60), [Type::Fighting, Type::Fighting], 149,
     [Some(&SCRATCH), Some(&LEER), Some(&KARATE_CHOP), Some(&FURY_SWIPES)], GrowthRate::MediumFast,
@@ -460,6 +501,14 @@ pub const RAICHU: Species = Species::new(
         &THUNDER, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &SWIFT, &SKULL_BASH, &REST, &THUNDER_WAVE, &SUBSTITUTE],
     &[],
     &[]
+);
+pub const RAPIDASH: Species = Species::new(
+    SpeciesKind::Rapidash, BaseStats::new(65, 100, 70, 105, 80), [Type::Fire, Type::Fire], 192,
+    [Some(&EMBER), Some(&TAIL_WHIP), Some(&STOMP), Some(&GROWL)], GrowthRate::MediumFast,
+    &[&TOXIC, &HORN_DRILL, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &HYPER_BEAM, &RAGE, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &FIRE_BLAST, &SWIFT,
+        &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[],
+    &[(30, &TAIL_WHIP), (32, &STOMP), (35, &GROWL), (39, &FIRE_SPIN), (47, &TAKE_DOWN), (55, &AGILITY)]
 );
 pub const RATICATE: Species = Species::new(
     SpeciesKind::Raticate, BaseStats::new(55, 81, 60, 97, 50), [Type::Normal, Type::Normal], 116,
@@ -613,6 +662,14 @@ pub const VOLTORB: Species = Species::new(
         &EXPLOSION, &SUBSTITUTE],
     &[(Evolve::Level(30), &ELECTRODE)],
     &[(17, &SONICBOOM), (22, &SELFDESTRUCT), (29, &LIGHT_SCREEN), (36, &SWIFT), (43, &EXPLOSION)]
+);
+pub const VULPIX: Species = Species::new(
+    SpeciesKind::Vulpix, BaseStats::new(38, 41, 40, 65, 65), [Type::Fire, Type::Fire], 63,
+    [Some(&EMBER), Some(&TAIL_WHIP), None, None], GrowthRate::MediumFast,
+    &[&TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &RAGE, &DIG, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &FIRE_BLAST, &SWIFT, &SKULL_BASH, &REST,
+        &SUBSTITUTE],
+    &[(Evolve::Item(Item::FireStone), &NINETALES)],
+    &[(16, &QUICK_ATTACK), (21, &ROAR), (28, &CONFUSE_RAY), (35, &FLAMETHROWER), (42, &FIRE_SPIN)]
 );
 pub const WARTORTLE: Species = Species::new(
     SpeciesKind::Wartortle, BaseStats::new(59, 63, 80, 58, 65), [Type::Water, Type::Water], 143,

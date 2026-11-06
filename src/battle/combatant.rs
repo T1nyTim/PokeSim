@@ -66,6 +66,9 @@ impl<'battle> Combatant<'battle> {
 
     pub(super) fn expected_damage(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> f64 {
         let hit_probability = state.stages.hit_probability(mv);
+        if let Some(damage) = mv.fixed_damage() {
+            return f64::from(damage.min(target_state.hp)) * hit_probability;
+        }
         if matches!(mv.effect, Effect::LeechSeed | Effect::Poison) {
             let can_apply = if matches!(mv.effect, Effect::LeechSeed) {
                 target_state.can_be_seeded(&target.pokemon.species.types)
@@ -96,7 +99,8 @@ impl<'battle> Combatant<'battle> {
                 })
                 .collect()
         });
-        scores[usize::from(target_state.hp).min(scores.len() - 1)] * hit_probability
+        let expected_damage = scores[usize::from(target_state.hp).min(scores.len() - 1)] * hit_probability;
+        mv.effect.damage_per_turn(expected_damage)
     }
 
     pub(super) fn new(pokemon: &'battle Pokemon, stats: Stats) -> Self {

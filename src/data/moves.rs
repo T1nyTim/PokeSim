@@ -106,6 +106,7 @@ pub const SOLARBEAM: Move = Move::new(MoveKind::Solarbeam, Effect::Charge, 120, 
 pub const SONICBOOM: Move = Move::new(MoveKind::Sonicboom, Effect::SpecialDamage, 1, Type::Normal, 90, 20);
 pub const SPIKE_CANNON: Move = Move::new(MoveKind::SpikeCannon, Effect::TwoToFiveAttacks, 20, Type::Normal, 100, 15);
 pub const SPORE: Move = Move::new(MoveKind::Spore, Effect::Sleep, 0, Type::Grass, 100, 15);
+pub const STOMP: Move = Move::new(MoveKind::Stomp, Effect::Flinch2, 65, Type::Normal, 100, 20);
 pub const STRING_SHOT: Move = Move::new(MoveKind::StringShot, Effect::SpeedDown, 0, Type::Bug, 95, 40);
 pub const STRUGGLE: Move = Move::new(MoveKind::Struggle, Effect::Recoil, 50, Type::Normal, 100, 10);
 pub const STUN_SPORE: Move = Move::new(MoveKind::StunSpore, Effect::Paralyze, 0, Type::Grass, 75, 30);

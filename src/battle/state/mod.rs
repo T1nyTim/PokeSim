@@ -7,7 +7,12 @@ use crate::{
         Combatant, Side,
         state::key::{BattleKey, CombatantKey},
     },
-    data::{Type, effects::Effect, move_data::Move, moves::BIDE},
+    data::{
+        Type,
+        effects::Effect,
+        move_data::Move,
+        moves::{BIDE, DIG},
+    },
     journey::TrainerItem,
 };
 
@@ -249,6 +254,7 @@ pub struct CombatantState {
     pub stages: StatStages,
     bide: Option<BideState>,
     pub burned: bool,
+    pub charging_slot: Option<u8>,
     confusion_elapsed: Option<u8>,
     disabled: Option<DisableState>,
     pub focus_energy: bool,
@@ -257,6 +263,7 @@ pub struct CombatantState {
     seeded: bool,
     sleep_elapsed: Option<u8>,
     trapping: Option<TrappingState>,
+    pub underground: bool,
 }
 
 impl CombatantState {
@@ -332,6 +339,11 @@ impl CombatantState {
         self.sleep_elapsed = Some(0);
     }
 
+    pub(super) const fn finish_charging(&mut self) {
+        self.charging_slot = None;
+        self.underground = false;
+    }
+
     pub(super) const fn full_paralysis_probability(&self) -> f64 {
         if self.paralyzed { 63.0 / 256.0 } else { 0.0 }
     }
@@ -342,6 +354,7 @@ impl CombatantState {
 
     pub(super) const fn interrupt_move(&mut self) {
         self.bide = None;
+        self.charging_slot = None;
         self.trapping = None;
     }
 
@@ -399,6 +412,11 @@ impl CombatantState {
         if self.paralyzed { (speed / 4).max(1) } else { speed }
     }
 
+    pub(super) fn start_charging(&mut self, slot: usize, mv: &Move) {
+        self.charging_slot = Some(slot as u8);
+        self.underground |= mv == &DIG;
+    }
+
     pub(super) fn trapping_move(&self) -> Option<&'static Move> {
         self.trapping.as_ref().map(|trapping| trapping.mv)
     }
@@ -410,6 +428,7 @@ impl CombatantState {
         stages: StatStages,
         bide: Option<BideState>,
         burned: bool,
+        charging_slot: Option<u8>,
         confusion_elapsed: Option<u8>,
         disabled: Option<DisableState>,
         focus_energy: bool,
@@ -418,12 +437,14 @@ impl CombatantState {
         seeded: bool,
         sleep_elapsed: Option<u8>,
         trapping: Option<TrappingState>,
+        underground: bool,
     ) -> Self {
         Self {
             hp,
             stages,
             bide,
             burned,
+            charging_slot,
             confusion_elapsed,
             disabled,
             focus_energy,
@@ -432,6 +453,7 @@ impl CombatantState {
             seeded,
             sleep_elapsed,
             trapping,
+            underground,
         }
     }
 
@@ -467,6 +489,7 @@ impl CombatantState {
         let dmg_dealt = damage.min(self.hp);
         self.hp -= dmg_dealt;
         self.interrupt_move();
+        self.underground = false;
         dmg_dealt
     }
 
@@ -476,6 +499,7 @@ impl CombatantState {
             stages: StatStages::default(),
             bide: None,
             burned: false,
+            charging_slot: None,
             confusion_elapsed: None,
             disabled: None,
             focus_energy: false,
@@ -484,6 +508,7 @@ impl CombatantState {
             seeded: false,
             sleep_elapsed: None,
             trapping: None,
+            underground: false,
         }
     }
 }

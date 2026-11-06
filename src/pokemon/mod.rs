@@ -125,6 +125,9 @@ impl Pokemon {
 
     fn expected_neutral_damage(&self, stats: &Stats, mv: &Move) -> f64 {
         let hit_prob = f64::from(mv.accuracy()) / 256.0f64;
+        if let Some(damage) = mv.fixed_damage() {
+            return f64::from(damage) * hit_prob;
+        }
         if matches!(mv.effect, Effect::LeechSeed | Effect::Poison) {
             return f64::from(CombatantState::residual_damage(64)) * hit_prob;
         }
@@ -156,7 +159,7 @@ impl Pokemon {
             .iter()
             .map(|&(hits, probabillity)| f64::from(hits) * probabillity)
             .sum();
-        expected_dmg * expected_hits * hit_prob
+        mv.effect.damage_per_turn(expected_dmg * expected_hits * hit_prob)
     }
 
     fn learn_move(&mut self, mv: &'static Move, policy: &PlayerPolicy, stats: &Stats) -> bool {

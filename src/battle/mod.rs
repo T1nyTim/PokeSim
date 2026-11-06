@@ -120,41 +120,6 @@ impl<'battle> Battle<'battle> {
         self.outcome.clone()
     }
 
-    fn start_state_turn(&mut self, state_key: &BattleKey, probability: f64, second_turn: bool) {
-        if probability == 0.0f64 {
-            return;
-        }
-        let state = state_key.to_state();
-        let player_move = if state.player.is_asleep() {
-            None
-        } else if let Some(mv) = state.player.trapping_move() {
-            Some((None, mv))
-        } else if state.is_biding(Side::Player) {
-            Some((None, &BIDE))
-        } else {
-            Some(
-                self.player_policy
-                    .select(&self.player.pokemon.moves, state.player_pp, state.player.disabled_slot(), |mv| {
-                        self.player.expected_damage(&self.ai, &state.player, &state.ai, mv)
-                    }),
-            )
-        };
-        let ai_action = if state.ai.is_asleep() {
-            TurnAction::Skip
-        } else if let Some(mv) = state.ai.trapping_move() {
-            TurnAction::Move(None, mv)
-        } else if state.is_biding(Side::Ai) {
-            TurnAction::Move(None, &BIDE)
-        } else {
-            let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2
-                + u8::from(state.player.has_status_condition())
-                + if second_turn { 10 } else { 0 };
-            TurnAction::AiChoice(key, 0)
-        };
-        let turn_branch = Branch::new(state, TurnContext::new([Some(TurnAction::new(player_move)), Some(ai_action)], None));
-        self.begin_turn(turn_branch, probability);
-    }
-
     fn begin_action(&mut self, mut branch: Branch, mut probability: f64) {
         if probability == 0.0f64 {
             return;
@@ -184,6 +149,7 @@ impl<'battle> Battle<'battle> {
         let move_slot = slot.or_else(|| pokemon.moves.iter().position(|known| *known == Some(mv)));
         let attacker = branch.state.combatant(side);
         if move_slot.is_some_and(|idx| attacker.is_disabled(idx)) {
+            branch.state.combatant_mut(side).charging_slot = None;
             self.finish_action(branch, probability);
             return;
         }
@@ -209,8 +175,17 @@ impl<'battle> Battle<'battle> {
             self.finish_action(branch, probability);
             return;
         }
-        branch.state.begin_move(side, slot, &mv.effect);
         let resolution = mv.effect.resolution();
+        if matches!(resolution, EffectResolution::Charge) {
+            let charging_combatant = branch.state.combatant_mut(side);
+            if charging_combatant.charging_slot.is_none() {
+                charging_combatant.start_charging(move_slot.expect("A charging move must have a move slot"), mv);
+                self.finish_action(branch, probability);
+                return;
+            }
+            charging_combatant.finish_charging();
+        }
+        branch.state.begin_move(side, slot, &mv.effect);
         if self.is_trainer && matches!(resolution, EffectResolution::SwitchOrEscape) {
             self.finish_action(branch, probability);
             return;
@@ -250,7 +225,7 @@ impl<'battle> Battle<'battle> {
                 branch.state.start_bide(side, long);
                 self.finish_action(branch, probability * long_prob);
             }
-            EffectResolution::Damage => self.resolve_damage_rolls(branch, probability),
+            EffectResolution::Charge | EffectResolution::Damage => self.resolve_damage_rolls(branch, probability),
             EffectResolution::Disable => {
                 let (target_side, occupied_slots, pp) = match side {
                     Side::Player => (Side::Ai, self.ai.pokemon.moves.map(|known_mv| known_mv.is_some()), None),
@@ -273,6 +248,10 @@ impl<'battle> Battle<'battle> {
                 branch.state.combatant_mut(target_side).disable(disabled);
                 self.finish_action(branch, probability * slot_prob);
             }
+            EffectResolution::FixedDamage => {
+                let damage = mv.fixed_damage().unwrap_or_else(|| todo!("Fixed damage for {}", mv.name()));
+                self.resolve_damage(branch, probability, damage);
+            }
             EffectResolution::Sleep => {
                 let target_side = match side {
                     Side::Player => Side::Ai,
@@ -285,7 +264,7 @@ impl<'battle> Battle<'battle> {
                 branch.state.apply_status_move(&mv.effect, side, target_types);
                 self.finish_action(branch, probability);
             }
-            EffectResolution::CopyMove | EffectResolution::FixedDamage | EffectResolution::SwitchOrEscape => todo!(),
+            EffectResolution::CopyMove | EffectResolution::SwitchOrEscape => todo!(),
         }
     }
 
@@ -512,6 +491,47 @@ impl<'battle> Battle<'battle> {
             branch.turn.side = Some(Side::Player);
         }
         self.resolve_action(branch, probability);
+    }
+
+    fn start_state_turn(&mut self, state_key: &BattleKey, probability: f64, second_turn: bool) {
+        if probability == 0.0f64 {
+            return;
+        }
+        let state = state_key.to_state();
+        let player_move = if state.player.is_asleep() {
+            None
+        } else if let Some(mv) = state.player.trapping_move() {
+            Some((None, mv))
+        } else if state.is_biding(Side::Player) {
+            Some((None, &BIDE))
+        } else if let Some(slot) = state.player.charging_slot {
+            let idx = usize::from(slot);
+            Some((Some(idx), self.player.pokemon.moves[idx].expect("A charging move must still be known")))
+        } else {
+            Some(
+                self.player_policy
+                    .select(&self.player.pokemon.moves, state.player_pp, state.player.disabled_slot(), |mv| {
+                        self.player.expected_damage(&self.ai, &state.player, &state.ai, mv)
+                    }),
+            )
+        };
+        let ai_action = if state.ai.is_asleep() {
+            TurnAction::Skip
+        } else if let Some(mv) = state.ai.trapping_move() {
+            TurnAction::Move(None, mv)
+        } else if state.is_biding(Side::Ai) {
+            TurnAction::Move(None, &BIDE)
+        } else if let Some(slot) = state.ai.charging_slot {
+            let idx = usize::from(slot);
+            TurnAction::Move(Some(idx), self.ai.pokemon.moves[idx].expect("A charging move must stilll be known"))
+        } else {
+            let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2
+                + u8::from(state.player.has_status_condition())
+                + if second_turn { 10 } else { 0 };
+            TurnAction::AiChoice(key, 0)
+        };
+        let turn_branch = Branch::new(state, TurnContext::new([Some(TurnAction::new(player_move)), Some(ai_action)], None));
+        self.begin_turn(turn_branch, probability);
     }
 }
 

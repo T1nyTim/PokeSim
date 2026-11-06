@@ -2,7 +2,7 @@ use core::cmp::Ordering;
 
 use crate::{
     battle::{Combatant, Side, state::BattleState},
-    data::{Type, move_data::Move},
+    data::{Type, effects::Effect, move_data::Move},
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -120,10 +120,13 @@ impl TurnContext {
     pub(super) fn hit_probability(&self, state: &BattleState, target_types: &[Type; 2]) -> f64 {
         let (_, mv) = self.selected_move();
         let side = self.side.expect("Accuracy resolution must have an acting side");
-        let attacker = match side {
-            Side::Player => &state.player,
-            Side::Ai => &state.ai,
+        let (attacker, target) = match side {
+            Side::Player => (&state.player, &state.ai),
+            Side::Ai => (&state.ai, &state.player),
         };
+        if target.underground && !mv.effect.targets_user() && !matches!(mv.effect, Effect::Swift | Effect::SwitchAndTeleport) {
+            return 0.0;
+        }
         let probability = attacker.stages.hit_probability(mv);
         mv.hit_probability(probability, target_types, side == Side::Ai)
     }
