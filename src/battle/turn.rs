@@ -4,7 +4,7 @@ use crate::{
     battle::{
         Combatant, Side,
         combatant::DamageOutcomes,
-        state::{BattleState, key::BattleKey},
+        state::{battle::BattleState, key::BattleKey},
     },
     data::{Type, effects::Effect, move_data::Move},
 };

@@ -2,7 +2,7 @@ use core::hash::{BuildHasherDefault, Hash, Hasher};
 use std::collections::HashMap;
 
 use crate::{
-    battle::state::{BattleState, BideState, CombatantState, DisableState, StatStages, TrappingState},
+    battle::state::{BideState, CombatantState, DisableState, StatStages, TrappingState, battle::BattleState},
     data::move_data::Move,
 };
 

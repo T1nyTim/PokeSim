@@ -25,6 +25,7 @@ impl<'battle> Combatant<'battle> {
             state.physical_attack(self.stats.atk),
             StatStages::apply(self.stats.def, state.stages.def),
             false,
+            &Effect::NoEffect,
         ) as u16
     }
 
@@ -148,7 +149,7 @@ impl<'battle> Combatant<'battle> {
                 StatStages::apply(target.stats.def, target_state.stages.def),
             )
         };
-        let mut damage = self.pokemon.base_damage(mv.power, attack, defense, crit);
+        let mut damage = self.pokemon.base_damage(mv.power, attack, defense, crit, &mv.effect);
         if self.pokemon.species.types.contains(&mv.mv_type) {
             damage += damage / 2;
         }

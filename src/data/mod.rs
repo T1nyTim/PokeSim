@@ -53,6 +53,7 @@ pub enum Item {
     Tm(&'static Move),
     WaterStone,
     XDefend,
+    XSpeed,
 }
 
 impl Item {
@@ -67,6 +68,7 @@ impl Item {
             | Self::Tm(_)
             | Self::WaterStone => None,
             Self::XDefend => Some(&Effect::DefenseUp1),
+            Self::XSpeed => Some(&Effect::SpeedUp),
         }
     }
 
@@ -81,6 +83,7 @@ impl Item {
             Self::Tm(mv) => mv.name(),
             Self::WaterStone => "Water Stone",
             Self::XDefend => "X Defend",
+            Self::XSpeed => "X Speed",
         }
     }
 }
@@ -126,6 +129,7 @@ pub enum SpeciesKind {
     Magnemite,
     Magneton,
     Mankey,
+    Meowth,
     Metapod,
     Muk,
     Nidoking,
@@ -139,6 +143,7 @@ pub enum SpeciesKind {
     Oddish,
     Paras,
     Parasect,
+    Persian,
     Pidgeot,
     Pidgeotto,
     Pidgey,
@@ -165,6 +170,8 @@ pub enum SpeciesKind {
     Staryu,
     Tentacool,
     Tentacruel,
+    Venomoth,
+    Venonat,
     Venusaur,
     Victreebel,
     Vileplume,
@@ -221,6 +228,7 @@ impl SpeciesKind {
             Self::Magnemite => "Magnemite",
             Self::Magneton => "Magneton",
             Self::Mankey => "Mankey",
+            Self::Meowth => "Meowth",
             Self::Metapod => "Metapod",
             Self::Muk => "Muk",
             Self::Nidoking => "Nidoking",
@@ -234,6 +242,7 @@ impl SpeciesKind {
             Self::Onix => "Onix",
             Self::Paras => "Paras",
             Self::Parasect => "Parasect",
+            Self::Persian => "Persian",
             Self::Pidgeot => "Pidgeot",
             Self::Pidgeotto => "Pidgeotto",
             Self::Pidgey => "Pidgey",
@@ -260,6 +269,8 @@ impl SpeciesKind {
             Self::Staryu => "Staryu",
             Self::Tentacool => "Tentacool",
             Self::Tentacruel => "Tentacruel",
+            Self::Venomoth => "Venomoth",
+            Self::Venonat => "Venonat",
             Self::Venusaur => "Venusaur",
             Self::Victreebel => "Victreebel",
             Self::Vileplume => "Vileplume",

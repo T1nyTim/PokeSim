@@ -48,10 +48,13 @@ impl Pokemon {
         self.species.name()
     }
 
-    pub(super) fn base_damage(&self, power: u8, mut attack: u32, mut defense: u32, crit: bool) -> u32 {
+    pub(super) fn base_damage(&self, power: u8, mut attack: u32, mut defense: u32, crit: bool, effect: &Effect) -> u32 {
         if attack >= 256 || defense >= 256 {
             attack = (attack / 4 % 256).max(1);
             defense = defense / 4 % 256;
+        }
+        if matches!(effect, Effect::Explode) {
+            defense = (defense / 2).max(1);
         }
         let level = u32::from(self.level) * if crit { 2 } else { 1 };
         let damage = ((2 * level / 5 + 2) * u32::from(power) * attack)
@@ -142,7 +145,7 @@ impl Pokemon {
         let crit_prob = mv.crit_probability(self.base_stats().spd, false);
         let mut expected_dmg = 0.0f64;
         for (crit, probability) in [(false, 1.0f64 - crit_prob), (true, crit_prob)] {
-            let mut damage = self.base_damage(mv.power, attack, defense, crit);
+            let mut damage = self.base_damage(mv.power, attack, defense, crit, &mv.effect);
             if self.species.types.contains(&mv.mv_type) {
                 damage += damage / 2;
             }

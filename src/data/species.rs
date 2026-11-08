@@ -319,6 +319,14 @@ pub const MANKEY: Species = Species::new(
     &[(Evolve::Level(28), &PRIMEAPE)],
     &[(15, &KARATE_CHOP), (21, &FURY_SWIPES), (27, &FOCUS_ENERGY), (33, &SEISMIC_TOSS), (39, &THRASH)]
 );
+pub const MEOWTH: Species = Species::new(
+    SpeciesKind::Meowth, BaseStats::new(40, 45, 35, 90, 40), [Type::Normal, Type::Normal], 69,
+    [Some(&SCRATCH), Some(&GROWL), None, None], GrowthRate::MediumFast,
+    &[&TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &PAY_DAY, &RAGE, &THUNDERBOLT, &THUNDER, &MIMIC, &DOUBLE_TEAM, &BIDE,
+        &SWIFT, &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[(Evolve::Level(28), &PERSIAN)],
+    &[(12, &BITE), (17, &PAY_DAY), (24, &SCREECH), (33, &FURY_SWIPES), (44, &SLASH)]
+);
 pub const METAPOD: Species = Species::new(
     SpeciesKind::Metapod, BaseStats::new(50, 20, 55, 30, 25), [Type::Bug, Type::Bug], 72,
     [Some(&HARDEN), None, None, None], GrowthRate::MediumFast,
@@ -422,6 +430,14 @@ pub const PARASECT: Species = Species::new(
         &BIDE, &SKULL_BASH, &REST, &SUBSTITUTE],
     &[],
     &[(13, &STUN_SPORE), (20, &LEECH_LIFE), (30, &SPORE), (39, &SLASH), (48, &GROWTH)]
+);
+pub const PERSIAN: Species = Species::new(
+    SpeciesKind::Persian, BaseStats::new(65, 70, 60, 115, 65), [Type::Normal, Type::Normal], 148,
+    [Some(&SCRATCH), Some(&GROWL), Some(&BITE), Some(&SCREECH)], GrowthRate::MediumFast,
+    &[&TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &HYPER_BEAM, &PAY_DAY, &RAGE, &THUNDERBOLT, &THUNDER, &MIMIC,
+        &DOUBLE_TEAM, &BIDE, &SWIFT, &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[],
+    &[(12, &BITE), (17, &PAY_DAY), (24, &SCREECH), (37, &FURY_SWIPES), (51, &SLASH)]
 );
 pub const PIDGEOT: Species = Species::new(
     SpeciesKind::Pidgeot, BaseStats::new(83, 80, 75, 91, 70), [Type::Normal, Type::Flying], 172,
@@ -630,6 +646,21 @@ pub const TENTACRUEL: Species = Species::new(
         &DOUBLE_TEAM, &REFLECT, &BIDE, &SKULL_BASH, &REST, &SUBSTITUTE],
     &[],
     &[(7, &SUPERSONIC), (13, &WRAP), (18, &POISON_STING), (22, &WATER_GUN), (27, &CONSTRICT), (35, &BARRIER), (43, &SCREECH), (50, &HYDRO_PUMP)]
+);
+pub const VENOMOTH: Species = Species::new(
+    SpeciesKind::Venomoth, BaseStats::new(70, 65, 50, 90, 90), [Type::Bug, Type::Poison], 138,
+    [Some(&TACKLE), Some(&DISABLE), Some(&POISONPOWDER), Some(&LEECH_LIFE)], GrowthRate::MediumFast,
+    &[&RAZOR_WIND, &WHIRLWIND, &TOXIC, &TAKE_DOWN, &DOUBLE_EDGE, &HYPER_BEAM, &RAGE, &MEGA_DRAIN, &SOLARBEAM, &PSYCHIC, &TELEPORT, &MIMIC,
+        &DOUBLE_TEAM, &REFLECT, &BIDE, &SWIFT, &REST, &PSYWAVE, &SUBSTITUTE],
+    &[],
+    &[(24, &POISONPOWDER), (27, &LEECH_LIFE), (30, &STUN_SPORE), (35, &PSYBEAM), (38, &SLEEP_POWDER), (43, &PSYCHIC)]
+);
+pub const VENONAT: Species = Species::new(
+    SpeciesKind::Venonat, BaseStats::new(60, 55, 50, 45, 40), [Type::Bug, Type::Poison], 75,
+    [Some(&TACKLE), Some(&DISABLE), None, None], GrowthRate::MediumFast,
+    &[&TOXIC, &TAKE_DOWN, &DOUBLE_EDGE, &RAGE, &MEGA_DRAIN, &SOLARBEAM, &PSYCHIC, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &REST, &PSYWAVE, &SUBSTITUTE],
+    &[(Evolve::Level(31), &VENOMOTH)],
+    &[(24, &POISONPOWDER), (27, &LEECH_LIFE), (30, &STUN_SPORE), (35, &PSYBEAM), (38, &SLEEP_POWDER), (43, &PSYCHIC)]
 );
 pub const VENUSAUR: Species = Species::new(
     SpeciesKind::Venusaur, BaseStats::new(80, 82, 83, 80, 100), [Type::Grass, Type::Poison], 208,

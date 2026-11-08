@@ -64,7 +64,7 @@ impl Player {
                 true
             }
             Item::Tm(mv) => self.active.learn_tm(mv, &self.policy, &self.stat_exp),
-            Item::XDefend => false,
+            Item::XDefend | Item::XSpeed => false,
             Item::FireStone | Item::LeafStone | Item::MoonStone | Item::ThunderStone | Item::WaterStone => todo!(),
         };
         if used {

@@ -11,7 +11,7 @@ use crate::{
     battle::{
         combatant::Combatant,
         state::{
-            BattleState,
+            battle::BattleState,
             key::{BattleKey, StateMap},
         },
         turn::{Branch, PendingAction, TurnAction, TurnContext},
@@ -407,14 +407,15 @@ impl<'battle> Battle<'battle> {
             Side::Player => (&branch.state.ai, &self.ai.pokemon.species.types),
             Side::Ai => (&branch.state.player, &self.player.pokemon.species.types),
         };
-        let secondary_prob = if matches!(mv.effect, Effect::Flinch1) && !branch.turn.can_flinch_target() {
+        let is_flinch = matches!(mv.effect, Effect::Flinch1 | Effect::Flinch2);
+        let secondary_prob = if is_flinch && !branch.turn.can_flinch_target() {
             0.0f64
         } else {
             mv.effect.secondary_probability(target, target_types, &mv.mv_type, side == Side::Ai)
         };
         if secondary_prob > 0.0f64 {
             let mut affected = branch.clone();
-            if matches!(mv.effect, Effect::Flinch1) {
+            if is_flinch {
                 affected.turn.flinch_target();
             } else {
                 affected.state.apply_secondary(&mv.effect, side);

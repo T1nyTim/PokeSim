@@ -146,6 +146,7 @@ impl Effect {
             | Self::ConfusionSide
             | Self::DefenseDownSide
             | Self::DrainHp
+            | Self::Explode
             | Self::Flinch1
             | Self::Flinch2
             | Self::NoEffect
@@ -186,7 +187,6 @@ impl Effect {
             Self::AttackTwice
             | Self::DreamEater
             | Self::EvasionUp
-            | Self::Explode
             | Self::FreezeSide
             | Self::Haze
             | Self::Heal
@@ -370,6 +370,7 @@ impl Effect {
             Self::SpecialUp1 => stages.spc = (stages.spc + 1).min(6),
             Self::SpecialUp2 => stages.spc = (stages.spc + 2).min(6),
             Self::SpeedDown | Self::SpeedDownSide => stages.spd = (stages.spd - 1).max(-6),
+            Self::SpeedUp => stages.spd = (stages.spd + 1).min(6),
             Self::AttackTwice
             | Self::Bide
             | Self::BurnSide1
@@ -408,7 +409,6 @@ impl Effect {
             | Self::Reflect
             | Self::Sleep
             | Self::SpecialDamage
-            | Self::SpeedUp
             | Self::Substitute
             | Self::SuperFang
             | Self::Swift
