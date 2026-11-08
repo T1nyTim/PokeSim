@@ -8,7 +8,7 @@ use crate::{
 
 pub type StateMap<K, V = f64> = HashMap<K, V, BuildHasherDefault<StateHasher>>;
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct BattleKey {
     player: CombatantKey,
     ai: CombatantKey,
@@ -37,12 +37,26 @@ impl BattleKey {
         )
     }
 
+    pub(super) const fn into_hp_tile(mut self) -> (Self, usize) {
+        let offset = (((self.player.flags & 15) << 4u8) | (self.ai.flags & 15)) as usize;
+        self.player.flags &= !15;
+        self.ai.flags &= !15;
+        (self, offset)
+    }
+
     pub(super) const fn new(player: CombatantKey, ai: CombatantKey, pp_damage_and_items: u64) -> Self {
         Self {
             player,
             ai,
             pp_damage_and_items,
         }
+    }
+
+    pub(super) fn with_hp_offset(&self, offset: usize) -> Self {
+        let mut restored = self.clone();
+        restored.player.flags |= (offset >> 4u8) as u64;
+        restored.ai.flags |= (offset & 15) as u64;
+        restored
     }
 }
 

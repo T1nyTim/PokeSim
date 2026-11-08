@@ -11,6 +11,7 @@ use crate::{
     battle::{
         combatant::Combatant,
         state::{
+            accumulator::StateAccumulator,
             battle::BattleState,
             key::{BattleKey, StateMap},
         },
@@ -33,7 +34,7 @@ pub enum Side {
 }
 
 pub struct Battle<'battle> {
-    states: StateMap<BattleKey>,
+    states: StateAccumulator,
     next_actions: StateMap<PendingAction>,
     player: Combatant<'battle>,
     player_policy: &'battle PlayerPolicy,
@@ -51,7 +52,7 @@ impl<'battle> Battle<'battle> {
         let player_combatant = Combatant::new(&player.active, player.stats());
         let ai_combatant = Combatant::new(ai, ai.stats());
         Self {
-            states: StateMap::default(),
+            states: StateAccumulator::default(),
             next_actions: StateMap::default(),
             player: player_combatant,
             player_policy: &player.policy,
@@ -80,15 +81,18 @@ impl<'battle> Battle<'battle> {
         self.outcome.unresolved = 0.0f64;
         let mut init_state = BattleState::new(&self.player, &self.ai, self.ai_item.map_or(0, |item| item.uses));
         init_state.cap_surplus_pp(self.remaining_turns);
-        self.states.insert(init_state.key(), 1.0f64);
+        self.states.entries.insert(init_state.key(), 1.0f64);
         let mut current_states = StateMap::default();
         let mut batch_turns = false;
         for idx in 0..max_depth {
-            if self.states.is_empty() {
+            if self.states.entries.is_empty() {
                 break;
             }
             self.remaining_turns -= 1;
-            mem::swap(&mut current_states, &mut self.states);
+            mem::swap(&mut current_states, &mut self.states.entries);
+            if self.remaining_turns > 0 && current_states.len() >= 0x0001_0000 {
+                self.states.enable_cache();
+            }
             self.player_choices.clear();
             let second_turn = idx % 256 == 1;
             batch_turns |= current_states.len() >= 4_096;
@@ -112,8 +116,9 @@ impl<'battle> Battle<'battle> {
                 self.resolve_pending_actions();
             }
             current_states.clear();
+            self.states.flush();
         }
-        self.outcome.unresolved += self.states.values().copied().fold(0.0f64, |total, prob| total + prob);
+        self.outcome.unresolved += self.states.entries.values().copied().fold(0.0f64, |total, prob| total + prob);
         self.states.clear();
         self.outcome.clone()
     }
@@ -315,7 +320,7 @@ impl<'battle> Battle<'battle> {
             return;
         }
         branch.state.cap_surplus_pp(self.remaining_turns);
-        *self.states.entry(branch.state.key()).or_insert(0.0f64) += probability;
+        self.states.accumulate(branch.state.key(), probability);
     }
 
     fn resolve_action(&mut self, mut branch: Branch, mut probability: f64) {

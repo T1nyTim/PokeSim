@@ -1,3 +1,4 @@
+pub(super) mod accumulator;
 pub(super) mod battle;
 pub(super) mod key;
 
