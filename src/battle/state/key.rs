@@ -140,7 +140,8 @@ impl CombatantKey {
             | (u64::from(trapping.map_or(0, |active| active.damage)) << 32u64)
             | (u64::from(trapping.map_or(0, |active| active.turns_elapsed)) << 48u64)
             | (u64::from(trapping.is_some_and(|active| active.ends_this_turn)) << 51u64)
-            | (u64::from(combatant.charging_slot.map_or(0, |slot| slot + 1)) << 52u64);
+            | (u64::from(combatant.charging_slot.map_or(0, |slot| slot + 1)) << 52u64)
+            | (u64::from(combatant.rage_accuracy.unwrap_or(0)) << 55u64);
         Self {
             flags: u64::from_le_bytes([
                 hp_low,
@@ -175,6 +176,7 @@ impl CombatantKey {
         let sleep = (self.status & 15) as u8;
         let confusion = ((self.status >> 4u64) & 7) as u8;
         let disabled_slot = ((self.status >> 7u64) & 7) as u8;
+        let rage_acc = (self.status >> 55u64) as u8;
         CombatantState::from_key(
             u16::from_le_bytes([hp_low, hp_high]),
             StatStages::new(
@@ -192,6 +194,7 @@ impl CombatantKey {
             flags & 64 != 0,
             flags & 32 != 0,
             flags & 1 != 0,
+            (rage_acc != 0).then_some(rage_acc),
             flags & 2 != 0,
             (sleep != 15).then_some(sleep),
             self.trapping_mv.map(|mv| {

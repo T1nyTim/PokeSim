@@ -116,17 +116,21 @@ impl TurnContext {
         attacker.damage_outcomes(target, attacker_state, target_state, mv)
     }
 
-    pub(super) fn hit_probability(&self, state: &BattleState, target_types: &[Type; 2]) -> f64 {
+    pub(super) fn hit_probability(&self, state: &mut BattleState, target_types: &[Type; 2]) -> f64 {
         let (_, mv) = self.selected_move();
         let side = self.side.expect("Accuracy resolution must have an acting side");
         let (attacker, target) = match side {
-            Side::Player => (&state.player, &state.ai),
-            Side::Ai => (&state.ai, &state.player),
+            Side::Player => (&mut state.player, &state.ai),
+            Side::Ai => (&mut state.ai, &state.player),
         };
         if target.underground && !mv.effect.targets_user() && !matches!(mv.effect, Effect::Swift | Effect::SwitchAndTeleport) {
             return 0.0;
         }
-        let probability = attacker.stages.hit_probability(mv);
+        let probability = if matches!(mv.effect, Effect::Rage) {
+            attacker.rage_hit_probability()
+        } else {
+            attacker.stages.hit_probability(mv)
+        };
         mv.hit_probability(probability, target_types, side == Side::Ai)
     }
 

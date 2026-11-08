@@ -97,13 +97,16 @@ impl BattleState {
         }
     }
 
-    pub(crate) fn apply_damage(&mut self, dmg: u16, mv: &Move, side: Side) -> u16 {
+    pub(crate) fn apply_damage(&mut self, dmg: u16, mv: &Move, side: Side, hits: u16) -> u16 {
         let (attacker, target) = match side {
             Side::Player => (&mut self.player, &mut self.ai),
             Side::Ai => (&mut self.ai, &mut self.player),
         };
         let dmg_dealt = dmg.min(target.hp);
         target.hp -= dmg_dealt;
+        if dmg_dealt > 0 && !matches!(mv.effect, Effect::Explode) {
+            target.build_rage(hits);
+        }
         let recoil = mv.recoil_damage(dmg_dealt);
         attacker.hp = attacker.hp.saturating_sub(recoil);
         self.last_damage = dmg_dealt;
@@ -155,6 +158,13 @@ impl BattleState {
         if matches!(effect, Effect::Explode) {
             self.combatant_mut(side).hp = 0;
         }
+        if matches!(effect, Effect::Disable | Effect::Explode) {
+            let target = match side {
+                Side::Player => &mut self.ai,
+                Side::Ai => &mut self.player,
+            };
+            target.build_rage(1);
+        }
     }
 
     pub(crate) fn cap_surplus_pp(&mut self, remaining_turns: usize) {
@@ -174,7 +184,7 @@ impl BattleState {
             Side::Ai => &mut self.ai,
         };
         if let Some(damage) = combatant.continue_bide(self.last_damage) {
-            self.apply_damage(damage, &BIDE, side);
+            self.apply_damage(damage, &BIDE, side, 1);
         }
     }
 
@@ -184,7 +194,7 @@ impl BattleState {
             Side::Ai => &mut self.ai,
         };
         let (mv, damage, expiry_prob) = attacker.continue_trapping();
-        self.apply_damage(damage, mv, side);
+        self.apply_damage(damage, mv, side, 1);
         expiry_prob
     }
 

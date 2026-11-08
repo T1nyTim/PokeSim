@@ -33,22 +33,7 @@ impl<'battle> Combatant<'battle> {
         let (attack, defense) = Self::damage_stage_indices(state, target_state, mv);
         let outcomes = &cache.staged(state, mv).outcomes[attack][defense];
         let cached = outcomes.get_or_init(|| {
-            let crit_prob = self.crit_probability(mv, state.focus_energy);
-            let normal = self.damage_rolls(target, state, target_state, mv, false);
-            let mut combined: Vec<_> = normal
-                .iter()
-                .map(|&(damage, probability)| (damage, probability * (1.0f64 - crit_prob)))
-                .filter(|&(_, probability)| probability > 0.0f64)
-                .collect();
-            if crit_prob > 0.0f64 {
-                for &(damage, probability) in self.damage_rolls(target, state, target_state, mv, true) {
-                    let crit_roll_prob = probability * crit_prob;
-                    match combined.binary_search_by_key(&damage, |&(rolled_dmg, _)| rolled_dmg) {
-                        Ok(idx) => combined[idx].1 += crit_roll_prob,
-                        Err(idx) => combined.insert(idx, (damage, crit_roll_prob)),
-                    }
-                }
-            }
+            let combined = self.single_hit_outcomes(target, state, target_state, mv);
             if matches!(mv.effect, Effect::TwoToFiveAttacks) {
                 let mut totals = BTreeMap::new();
                 for (damage, dmg_prob) in combined {
@@ -115,6 +100,26 @@ impl<'battle> Combatant<'battle> {
                 .map(|mv| (mv, DamageRollCache::new()))
                 .collect(),
         }
+    }
+
+    pub(super) fn single_hit_outcomes(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> Vec<(u16, f64)> {
+        let crit_prob = self.crit_probability(mv, state.focus_energy);
+        let normal = self.damage_rolls(target, state, target_state, mv, false);
+        let mut combined: Vec<_> = normal
+            .iter()
+            .map(|&(damage, probability)| (damage, probability * (1.0f64 - crit_prob)))
+            .filter(|&(_, probability)| probability > 0.0f64)
+            .collect();
+        if crit_prob > 0.0f64 {
+            for &(damage, probability) in self.damage_rolls(target, state, target_state, mv, true) {
+                let crit_roll_prob = probability * crit_prob;
+                match combined.binary_search_by_key(&damage, |&(rolled_dmg, _)| rolled_dmg) {
+                    Ok(idx) => combined[idx].1 += crit_roll_prob,
+                    Err(idx) => combined.insert(idx, (damage, crit_roll_prob)),
+                }
+            }
+        }
+        combined
     }
 
     const fn damage_stage_indices(state: &CombatantState, target_state: &CombatantState, mv: &Move) -> (usize, usize) {

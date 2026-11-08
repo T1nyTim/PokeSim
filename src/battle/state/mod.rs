@@ -3,7 +3,12 @@ pub(super) mod key;
 
 use core::hash::Hash;
 
-use crate::data::{Type, effects::Effect, move_data::Move, moves::DIG};
+use crate::data::{
+    Type,
+    effects::Effect,
+    move_data::Move,
+    moves::{DIG, RAGE},
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct BideState {
@@ -39,6 +44,7 @@ pub struct CombatantState {
     pub focus_energy: bool,
     paralyzed: bool,
     poisoned: bool,
+    pub rage_accuracy: Option<u8>,
     seeded: bool,
     sleep_elapsed: Option<u8>,
     trapping: Option<TrappingState>,
@@ -186,6 +192,15 @@ impl CombatantState {
         if self.burned { (attack / 2).max(1) } else { attack }
     }
 
+    pub(super) fn rage_hit_probability(&mut self) -> f64 {
+        let accuracy = self.rage_accuracy.unwrap_or_else(|| RAGE.accuracy());
+        let threshold = StatStages::apply(u16::from(accuracy), self.stages.acc).min(255) as u8;
+        if self.rage_accuracy.is_some() {
+            self.rage_accuracy = Some(threshold);
+        }
+        f64::from(threshold) / 256.0
+    }
+
     pub(super) fn speed(&self, base_spd: u16) -> u32 {
         let speed = StatStages::apply(base_spd, self.stages.spd);
         if self.paralyzed { (speed / 4).max(1) } else { speed }
@@ -194,6 +209,12 @@ impl CombatantState {
     pub(super) fn start_charging(&mut self, slot: usize, mv: &Move) {
         self.charging_slot = Some(slot as u8);
         self.underground |= mv == &DIG;
+    }
+
+    pub(super) fn start_rage(&mut self) {
+        if self.rage_accuracy.is_none() {
+            self.rage_accuracy = Some(StatStages::apply(u16::from(RAGE.accuracy()), self.stages.acc).min(255) as u8);
+        }
     }
 
     pub(super) fn trapping_move(&self) -> Option<&'static Move> {
@@ -213,6 +234,7 @@ impl CombatantState {
         focus_energy: bool,
         paralyzed: bool,
         poisoned: bool,
+        rage_accuracy: Option<u8>,
         seeded: bool,
         sleep_elapsed: Option<u8>,
         trapping: Option<TrappingState>,
@@ -229,6 +251,7 @@ impl CombatantState {
             focus_energy,
             paralyzed,
             poisoned,
+            rage_accuracy,
             seeded,
             sleep_elapsed,
             trapping,
@@ -242,6 +265,12 @@ impl CombatantState {
 
     const fn start_trapping(&mut self, mv: &'static Move, damage: u16) {
         self.trapping = Some(TrappingState::new(mv, damage));
+    }
+
+    fn build_rage(&mut self, hits: u16) {
+        if self.hp > 0 && self.rage_accuracy.is_some() {
+            self.stages.atk = (i16::from(self.stages.atk) + hits.cast_signed()).min(6) as i8;
+        }
     }
 
     #[expect(clippy::question_mark_used, reason = "handled before end of function")]
@@ -284,6 +313,7 @@ impl CombatantState {
             focus_energy: false,
             paralyzed: false,
             poisoned: false,
+            rage_accuracy: None,
             seeded: false,
             sleep_elapsed: None,
             trapping: None,

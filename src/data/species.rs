@@ -121,6 +121,14 @@ pub const CLOYSTER: Species = Species::new(
     &[],
     &[(50, &SPIKE_CANNON)]
 );
+pub const CUBONE: Species = Species::new(
+    SpeciesKind::Cubone, BaseStats::new(50, 50, 95, 35, 40), [Type::Ground, Type::Ground], 87,
+    [Some(&BONE_CLUB), Some(&GROWL), None, None], GrowthRate::MediumFast,
+    &[&MEGA_PUNCH, &MEGA_KICK, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &SUBMISSION, &COUNTER,
+        &SEISMIC_TOSS, &RAGE, &EARTHQUAKE, &FISSURE, &DIG, &MIMIC, &DOUBLE_TEAM, &BIDE, &FIRE_BLAST, &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[(Evolve::Level(28), &MAROWAK)],
+    &[(25, &LEER), (31, &FOCUS_ENERGY), (38, &THRASH), (43, &BONEMERANG), (46, &RAGE)]
+);
 pub const DIGLETT: Species = Species::new(
     SpeciesKind::Diglett, BaseStats::new(10, 55, 25, 95, 45), [Type::Ground, Type::Ground], 81,
     [Some(&SCRATCH), None, None, None], GrowthRate::MediumFast,
@@ -318,6 +326,14 @@ pub const MANKEY: Species = Species::new(
         &THUNDER, &DIG, &MIMIC, &DOUBLE_TEAM, &BIDE, &METRONOME, &SWIFT, &SKULL_BASH, &REST, &ROCK_SLIDE, &SUBSTITUTE],
     &[(Evolve::Level(28), &PRIMEAPE)],
     &[(15, &KARATE_CHOP), (21, &FURY_SWIPES), (27, &FOCUS_ENERGY), (33, &SEISMIC_TOSS), (39, &THRASH)]
+);
+pub const MAROWAK: Species = Species::new(
+    SpeciesKind::Marowak, BaseStats::new(60, 80, 110, 45, 50), [Type::Ground, Type::Ground], 124,
+    [Some(&BONE_CLUB), Some(&GROWL), Some(&LEER), Some(&FOCUS_ENERGY)], GrowthRate::MediumFast,
+    &[&MEGA_PUNCH, &MEGA_KICK, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &HYPER_BEAM, &SUBMISSION,
+        &COUNTER, &SEISMIC_TOSS, &RAGE, &EARTHQUAKE, &FISSURE, &DIG, &MIMIC, &DOUBLE_TEAM, &BIDE, &FIRE_BLAST, &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[],
+    &[(25, &LEER), (33, &FOCUS_ENERGY), (41, &THRASH), (48, &BONEMERANG), (55, &RAGE)]
 );
 pub const MEOWTH: Species = Species::new(
     SpeciesKind::Meowth, BaseStats::new(40, 45, 35, 90, 40), [Type::Normal, Type::Normal], 69,

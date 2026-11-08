@@ -19,7 +19,7 @@ use crate::{
     data::{
         effects::{Effect, EffectResolution},
         move_data::Move,
-        moves::BIDE,
+        moves::{BIDE, RAGE},
     },
     journey::{MatchupGroup, MatchupKind, PlayerPolicy, TrainerItem},
     player::Player,
@@ -199,7 +199,7 @@ impl<'battle> Battle<'battle> {
             self.finish_action(branch, probability);
             return;
         }
-        let hit_prob = branch.turn.hit_probability(&branch.state, target_types);
+        let hit_prob = branch.turn.hit_probability(&mut branch.state, target_types);
         if hit_prob == 0.0f64 {
             branch.state.miss_move();
             self.finish_action(branch, probability);
@@ -248,7 +248,7 @@ impl<'battle> Battle<'battle> {
             }
             EffectResolution::FixedDamage => {
                 let damage = mv.fixed_damage().unwrap_or_else(|| todo!("Fixed damage for {}", mv.name()));
-                self.resolve_damage(branch, probability, damage);
+                self.resolve_damage(branch, probability, damage, 1);
             }
             EffectResolution::Sleep => {
                 let target_side = match side {
@@ -324,6 +324,7 @@ impl<'battle> Battle<'battle> {
         }
         let side = branch.turn.side.expect("Executing an action requires an acting side");
         if side == Side::Ai
+            && branch.state.ai.rage_accuracy.is_none()
             && let Some(item) = self.ai_item
         {
             let item_prob = item.use_probability(branch.state.ai_items_left);
@@ -389,13 +390,16 @@ impl<'battle> Battle<'battle> {
         self.begin_action(branch, probability);
     }
 
-    fn resolve_damage(&mut self, mut branch: Branch, mut probability: f64, dmg: u16) {
+    fn resolve_damage(&mut self, mut branch: Branch, mut probability: f64, dmg: u16, hits: u16) {
         if probability == 0.0f64 {
             return;
         }
         let side = branch.turn.side.expect("Applying damage requires an acting side");
         let (_, mv) = branch.turn.selected_move();
-        let dmg_dealt = branch.state.apply_damage(dmg, mv, side);
+        let dmg_dealt = branch.state.apply_damage(dmg, mv, side, hits);
+        if matches!(mv.effect, Effect::Rage) && dmg_dealt > 0 {
+            branch.state.combatant_mut(side).start_rage();
+        }
         let max_hp = match side {
             Side::Player => self.player.stats.hp,
             Side::Ai => self.ai.stats.hp,
@@ -433,6 +437,21 @@ impl<'battle> Battle<'battle> {
         if probability == 0.0f64 {
             return;
         }
+        let (_, mv) = branch.turn.selected_move();
+        let (attacker, target, attacker_state, target_state) = match branch.turn.side.expect("Damage resolution requires an acting side") {
+            Side::Player => (&self.player, &self.ai, &branch.state.player, &branch.state.ai),
+            Side::Ai => (&self.ai, &self.player, &branch.state.ai, &branch.state.player),
+        };
+        if matches!(mv.effect, Effect::TwoToFiveAttacks) && target_state.rage_accuracy.is_some() {
+            let single_hits = attacker.single_hit_outcomes(target, attacker_state, target_state, mv);
+            for &(hits, count_prob) in mv.effect.hit_count_outcomes() {
+                for &(damage, roll_prob) in &single_hits {
+                    let alternative = branch.clone();
+                    self.resolve_damage(alternative, probability * count_prob * roll_prob, damage.saturating_mul(hits), hits);
+                }
+            }
+            return;
+        }
         let rolls = branch.turn.damage_outcomes(&branch.state, &self.player, &self.ai);
         let target_hp = match branch.turn.side.expect("Damage resolution requires an acting side") {
             Side::Player => branch.state.ai.hp,
@@ -447,9 +466,9 @@ impl<'battle> Battle<'battle> {
         };
         for &(dmg, roll_prob) in alternatives {
             let alternative = branch.clone();
-            self.resolve_damage(alternative, probability * roll_prob, dmg);
+            self.resolve_damage(alternative, probability * roll_prob, dmg, 1);
         }
-        self.resolve_damage(branch, probability * last_prob, last_dmg);
+        self.resolve_damage(branch, probability * last_prob, last_dmg, 1);
     }
 
     fn resolve_pending_actions(&mut self) {
@@ -491,6 +510,8 @@ impl<'battle> Battle<'battle> {
         } else if let Some(slot) = state.player.charging_slot {
             let idx = usize::from(slot);
             Some((Some(idx), self.player.pokemon.moves[idx].expect("A charging move must still be known")))
+        } else if state.player.rage_accuracy.is_some() {
+            Some((None, &RAGE))
         } else {
             let selection_key = state.player_selection_key();
             Some(*self.player_choices.entry(selection_key).or_insert_with(|| {
@@ -509,6 +530,8 @@ impl<'battle> Battle<'battle> {
         } else if let Some(slot) = state.ai.charging_slot {
             let idx = usize::from(slot);
             TurnAction::Move(Some(slot), self.ai.pokemon.moves[idx].expect("A charging move must stilll be known"))
+        } else if state.ai.rage_accuracy.is_some() {
+            TurnAction::Move(None, &RAGE)
         } else {
             let key = state.ai.disabled_slot().map_or(0, |slot| slot + 1) * 2
                 + u8::from(state.player.has_status_condition())

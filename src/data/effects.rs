@@ -569,6 +569,7 @@ impl Effect {
             | Self::Poison
             | Self::PoisonSide1
             | Self::PoisonSide2
+            | Self::Rage
             | Self::Recoil
             | Self::Sleep
             | Self::SpecialDamage
@@ -582,7 +583,6 @@ impl Effect {
             | Self::Metronome
             | Self::MirrorMove
             | Self::OHKO
-            | Self::Rage
             | Self::SpeedUp
             | Self::ThrashPetalDance
             | Self::Twineedle => todo!(),
