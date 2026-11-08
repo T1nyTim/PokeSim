@@ -2,10 +2,9 @@ extern crate alloc;
 
 use alloc::{collections::BTreeMap, rc::Rc};
 use core::{array, cell::OnceCell};
-use std::collections::HashMap;
 
 use crate::{
-    battle::state::{CombatantState, StatStages},
+    battle::state::{CombatantState, StatStages, key::StateMap},
     data::{effects::Effect, move_data::Move, moves::STRUGGLE},
     pokemon::{Pokemon, Stats},
 };
@@ -15,7 +14,7 @@ pub(super) type DamageOutcomes = Rc<[(u16, f64)]>;
 pub struct Combatant<'battle> {
     pub pokemon: &'battle Pokemon,
     pub stats: Stats,
-    damage_rolls: HashMap<&'static Move, DamageRollCache>,
+    damage_rolls: StateMap<&'static Move, DamageRollCache>,
 }
 
 impl<'battle> Combatant<'battle> {

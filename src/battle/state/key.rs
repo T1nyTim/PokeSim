@@ -6,7 +6,7 @@ use crate::{
     data::move_data::Move,
 };
 
-pub type StateMap<K> = HashMap<K, f64, BuildHasherDefault<StateHasher>>;
+pub type StateMap<K, V = f64> = HashMap<K, V, BuildHasherDefault<StateHasher>>;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct BattleKey {

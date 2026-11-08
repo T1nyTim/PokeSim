@@ -158,8 +158,13 @@ impl BattleState {
     }
 
     pub(crate) fn cap_surplus_pp(&mut self, remaining_turns: usize) {
+        let max_pp = if remaining_turns > 1 && (self.player.is_asleep() || self.player.bide.is_some() || self.player.trapping.is_some()) {
+            remaining_turns - 1
+        } else {
+            remaining_turns
+        };
         for pp in &mut self.player_pp {
-            *pp = (*pp).min(remaining_turns as u8);
+            *pp = (*pp).min(max_pp as u8);
         }
     }
 
@@ -208,6 +213,32 @@ impl BattleState {
             last_damage: 0,
             ai_items_left,
         }
+    }
+
+    pub(crate) fn player_selection_key(&self) -> u64 {
+        let disabled_slot = self.player.disabled_slot();
+        let mut available_moves = 0;
+        for (slot, &pp) in self.player_pp.iter().enumerate() {
+            if pp > 0 && disabled_slot != Some(slot as u8) {
+                available_moves |= 1 << slot;
+            }
+        }
+        let flags = available_moves
+            | (u8::from(self.player.burned) << 4u8)
+            | (u8::from(self.player.focus_energy) << 5u8)
+            | (u8::from(self.ai.seeded) << 6u8)
+            | (u8::from(self.ai.has_status_condition()) << 7u8);
+        let [hp_low, hp_high] = self.ai.hp.to_le_bytes();
+        u64::from_le_bytes([
+            hp_low,
+            hp_high,
+            self.player.stages.atk as u8,
+            self.player.stages.spc as u8,
+            self.player.stages.acc as u8,
+            self.ai.stages.def as u8,
+            self.ai.stages.spc as u8,
+            flags,
+        ])
     }
 
     pub(crate) fn use_ai_item(&mut self, item: &TrainerItem) {

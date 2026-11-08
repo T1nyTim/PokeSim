@@ -37,6 +37,7 @@ pub struct Battle<'battle> {
     next_actions: StateMap<PendingAction>,
     player: Combatant<'battle>,
     player_policy: &'battle PlayerPolicy,
+    player_choices: StateMap<u64, (Option<usize>, &'static Move)>,
     ai: Combatant<'battle>,
     ai_choices: [AiChoices; 20],
     ai_item: Option<&'battle TrainerItem>,
@@ -54,6 +55,7 @@ impl<'battle> Battle<'battle> {
             next_actions: StateMap::default(),
             player: player_combatant,
             player_policy: &player.policy,
+            player_choices: StateMap::default(),
             ai: ai_combatant,
             ai_choices: array::from_fn(|key| {
                 let disabled_slot = (key % 10 / 2).checked_sub(1).map(|slot| slot as u8);
@@ -87,6 +89,7 @@ impl<'battle> Battle<'battle> {
             }
             self.remaining_turns -= 1;
             mem::swap(&mut current_states, &mut self.states);
+            self.player_choices.clear();
             let second_turn = idx % 256 == 1;
             batch_turns |= current_states.len() >= 4_096;
             if !batch_turns {
@@ -489,12 +492,13 @@ impl<'battle> Battle<'battle> {
             let idx = usize::from(slot);
             Some((Some(idx), self.player.pokemon.moves[idx].expect("A charging move must still be known")))
         } else {
-            Some(
+            let selection_key = state.player_selection_key();
+            Some(*self.player_choices.entry(selection_key).or_insert_with(|| {
                 self.player_policy
                     .select(&self.player.pokemon.moves, state.player_pp, state.player.disabled_slot(), |mv| {
                         self.player.expected_damage(&self.ai, &state.player, &state.ai, mv)
-                    }),
-            )
+                    })
+            }))
         };
         let ai_action = if state.ai.is_asleep() {
             TurnAction::Skip
