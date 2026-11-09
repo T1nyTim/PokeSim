@@ -43,9 +43,11 @@ pub struct CombatantState {
     confusion_elapsed: Option<u8>,
     disabled: Option<DisableState>,
     pub focus_energy: bool,
+    pub frozen: bool,
     paralyzed: bool,
     poisoned: bool,
     pub rage_accuracy: Option<u8>,
+    pub reflect: bool,
     seeded: bool,
     sleep_elapsed: Option<u8>,
     trapping: Option<TrappingState>,
@@ -73,6 +75,10 @@ impl CombatantState {
 
     pub(crate) const fn can_be_paralyzed(&self) -> bool {
         self.hp > 0 && !self.has_status_condition()
+    }
+
+    pub(crate) const fn has_status_condition(&self) -> bool {
+        self.burned || self.frozen || self.paralyzed || self.poisoned || self.sleep_elapsed.is_some()
     }
 
     pub(crate) const fn paralyze(&mut self) {
@@ -134,10 +140,6 @@ impl CombatantState {
         if self.paralyzed { 63.0 / 256.0 } else { 0.0 }
     }
 
-    pub(super) const fn has_status_condition(&self) -> bool {
-        self.burned || self.paralyzed || self.poisoned || self.sleep_elapsed.is_some()
-    }
-
     pub(super) const fn interrupt_move(&mut self) {
         self.bide = None;
         self.charging_slot = None;
@@ -193,9 +195,9 @@ impl CombatantState {
         if self.burned { (attack / 2).max(1) } else { attack }
     }
 
-    pub(super) fn rage_hit_probability(&mut self) -> f64 {
+    pub(super) fn rage_hit_probability(&mut self, target_eva: i8) -> f64 {
         let accuracy = self.rage_accuracy.unwrap_or_else(|| RAGE.accuracy());
-        let threshold = StatStages::apply(u16::from(accuracy), self.stages.acc).min(255) as u8;
+        let threshold = self.stages.hit_threshold(accuracy, target_eva);
         if self.rage_accuracy.is_some() {
             self.rage_accuracy = Some(threshold);
         }
@@ -233,9 +235,11 @@ impl CombatantState {
         confusion_elapsed: Option<u8>,
         disabled: Option<DisableState>,
         focus_energy: bool,
+        frozen: bool,
         paralyzed: bool,
         poisoned: bool,
         rage_accuracy: Option<u8>,
+        reflect: bool,
         seeded: bool,
         sleep_elapsed: Option<u8>,
         trapping: Option<TrappingState>,
@@ -250,9 +254,11 @@ impl CombatantState {
             confusion_elapsed,
             disabled,
             focus_energy,
+            frozen,
             paralyzed,
             poisoned,
             rage_accuracy,
+            reflect,
             seeded,
             sleep_elapsed,
             trapping,
@@ -312,9 +318,11 @@ impl CombatantState {
             confusion_elapsed: None,
             disabled: None,
             focus_energy: false,
+            frozen: false,
             paralyzed: false,
             poisoned: false,
             rage_accuracy: None,
+            reflect: false,
             seeded: false,
             sleep_elapsed: None,
             trapping: None,
@@ -355,10 +363,35 @@ pub struct StatStages {
     pub spd: i8,
     pub spc: i8,
     pub acc: i8,
+    pub eva: i8,
 }
 
 impl StatStages {
     pub(super) fn apply(stat: u16, stage: i8) -> u32 {
+        Self::scale(u32::from(stat), stage).clamp(1, 999)
+    }
+
+    pub(super) fn hit_probability(&self, mv: &Move, target_eva: i8) -> f64 {
+        f64::from(self.hit_threshold(mv.accuracy(), target_eva)) / 256.0
+    }
+
+    const fn new(atk: i8, def: i8, spd: i8, spc: i8, acc: i8, eva: i8) -> Self {
+        Self {
+            atk,
+            def,
+            spd,
+            spc,
+            acc,
+            eva,
+        }
+    }
+
+    fn hit_threshold(&self, accuracy: u8, target_eva: i8) -> u8 {
+        let adjusted = Self::scale(u32::from(accuracy), self.acc).max(1);
+        Self::scale(adjusted, -target_eva).clamp(1, 255) as u8
+    }
+
+    fn scale(stat: u32, stage: i8) -> u32 {
         let (numerator, denominator) = match stage {
             -6 => (25, 100),
             -5 => (28, 100),
@@ -375,16 +408,7 @@ impl StatStages {
             6 => (4, 1),
             _ => unreachable!("Stat stages must be between -6 and 6"),
         };
-        u32::from(stat * numerator / denominator).clamp(1, 999)
-    }
-
-    pub(super) fn hit_probability(&self, mv: &Move) -> f64 {
-        let threshold = Self::apply(u16::from(mv.accuracy()), self.acc).min(255);
-        f64::from(threshold) / 256.0
-    }
-
-    const fn new(atk: i8, def: i8, spd: i8, spc: i8, acc: i8) -> Self {
-        Self { atk, def, spd, spc, acc }
+        stat * numerator / denominator
     }
 }
 

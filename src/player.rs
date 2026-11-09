@@ -52,7 +52,8 @@ impl Player {
     pub(super) fn use_item(&mut self, item: &Item) -> bool {
         // Doesn't feel like the right place to keep this
         let used = match item {
-            Item::HpUp => self.stat_exp.use_hp_up(),
+            Item::Calcium | Item::Carbos | Item::HpUp | Item::Iron | Item::Protein => self.stat_exp.use_vitamin(item),
+            Item::PpUp => self.active.use_pp_up(&self.policy, &self.stat_exp),
             Item::RareCandy => {
                 if self.active.level >= 100 {
                     return false;
@@ -88,11 +89,29 @@ pub struct StatExp {
 }
 
 impl StatExp {
-    const fn use_hp_up(&mut self) -> bool {
-        if self.hp >= 25_600 {
+    fn use_vitamin(&mut self, item: &Item) -> bool {
+        // Doesn't feel like the right place to keep this
+        let stat = match item {
+            Item::Calcium => &mut self.spc,
+            Item::Carbos => &mut self.spd,
+            Item::HpUp => &mut self.hp,
+            Item::Iron => &mut self.def,
+            Item::Protein => &mut self.atk,
+            Item::FireStone
+            | Item::LeafStone
+            | Item::MoonStone
+            | Item::PpUp
+            | Item::RareCandy
+            | Item::ThunderStone
+            | Item::Tm(_)
+            | Item::WaterStone
+            | Item::XDefend
+            | Item::XSpeed => unreachable!("Only vitamins add stat experience"),
+        };
+        if *stat >= 25_600 {
             return false;
         }
-        self.hp += 2_560;
+        *stat += 2_560;
         true
     }
 

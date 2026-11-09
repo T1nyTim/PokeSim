@@ -1,5 +1,7 @@
 pub mod data;
 
+use core::array;
+
 use crate::{
     battle::state::CombatantState,
     data::{BaseStats, Species, effects::Effect, move_data::Move},
@@ -37,9 +39,12 @@ pub struct Pokemon {
     pub dvs: Dvs,
     pub level: u8,
     pub moves: [Option<&'static Move>; 4],
+    pp_ups: [u8; 4],
 }
 
 impl Pokemon {
+    const AVG_HP: u16 = 64;
+
     pub(super) const fn base_stats(&self) -> &BaseStats {
         &self.species.base_stats
     }
@@ -80,7 +85,13 @@ impl Pokemon {
                 moves[3] = Some(mv);
             }
         }
-        Self { species, dvs, level, moves }
+        Self {
+            species,
+            dvs,
+            level,
+            moves,
+            pp_ups: [0; 4],
+        }
     }
 
     pub(super) fn learn_level_up_moves(&mut self, policy: &PlayerPolicy, stat_exp: &StatExp) {
@@ -109,6 +120,10 @@ impl Pokemon {
         self.learn_level_up_moves(policy, stat_exp);
     }
 
+    pub(super) fn move_pp(&self) -> [u8; 4] {
+        array::from_fn(|slot| self.moves[slot].map_or(0, |mv| mv.pp + (mv.pp / 5).min(7) * self.pp_ups[slot]))
+    }
+
     pub(super) fn stats(&self) -> Stats {
         Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, &StatExp::default())
     }
@@ -121,6 +136,17 @@ impl Pokemon {
         }
     }
 
+    pub(super) fn use_pp_up(&mut self, policy: &PlayerPolicy, stat_exp: &StatExp) -> bool {
+        let stats = Stats::from_base_stats(self.base_stats(), &self.dvs, self.level, stat_exp);
+        let eligible = self.pp_ups.map(|uses| u8::from(uses < 3));
+        let (Some(slot), mv) = policy.select(&self.moves, eligible, None, |candidate| self.expected_neutral_damage(&stats, candidate)) else {
+            return false;
+        };
+        self.pp_ups[slot] += 1;
+        println!("Raised PP: {}", mv.name());
+        true
+    }
+
     const fn with_move(mut self, mv: &'static Move) -> Self {
         self.moves[2] = Some(mv);
         self
@@ -128,11 +154,14 @@ impl Pokemon {
 
     fn expected_neutral_damage(&self, stats: &Stats, mv: &Move) -> f64 {
         let hit_prob = f64::from(mv.accuracy()) / 256.0f64;
+        if matches!(mv.effect, Effect::Ohko) {
+            return f64::from(Self::AVG_HP) * hit_prob;
+        }
         if let Some(damage) = mv.fixed_damage() {
             return f64::from(damage) * hit_prob;
         }
         if matches!(mv.effect, Effect::LeechSeed | Effect::Poison) {
-            return f64::from(CombatantState::residual_damage(64)) * hit_prob;
+            return f64::from(CombatantState::residual_damage(Self::AVG_HP)) * hit_prob;
         }
         if mv.power == 0 {
             return 0.0;
@@ -173,6 +202,7 @@ impl Pokemon {
             println!("Forgot: {}", forgotten.name());
         }
         self.moves[slot] = Some(mv);
+        self.pp_ups[slot] = 0;
         println!("Learnt: {}", mv.name());
         true
     }

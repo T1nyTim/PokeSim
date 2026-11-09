@@ -174,7 +174,7 @@ impl BattleState {
             remaining_turns
         };
         for pp in &mut self.player_pp {
-            *pp = (*pp).min(max_pp as u8);
+            *pp = usize::from(*pp).min(max_pp) as u8;
         }
     }
 
@@ -219,13 +219,13 @@ impl BattleState {
         Self {
             player: CombatantState::new(player.stats.hp),
             ai: CombatantState::new(ai.stats.hp),
-            player_pp: player.pokemon.moves.map(|slot| slot.map_or(0, |mv| mv.pp)),
+            player_pp: player.pokemon.move_pp(),
             last_damage: 0,
             ai_items_left,
         }
     }
 
-    pub(crate) fn player_selection_key(&self) -> u64 {
+    pub(crate) fn player_selection_key(&self, has_ohko_speed: bool) -> u64 {
         let disabled_slot = self.player.disabled_slot();
         let mut available_moves = 0;
         for (slot, &pp) in self.player_pp.iter().enumerate() {
@@ -239,13 +239,15 @@ impl BattleState {
             | (u8::from(self.ai.seeded) << 6u8)
             | (u8::from(self.ai.has_status_condition()) << 7u8);
         let [hp_low, hp_high] = self.ai.hp.to_le_bytes();
+        let acc_and_eva = (self.player.stages.acc as u8 & 15) | ((self.ai.stages.eva as u8) << 4u8);
+        let def_and_flags = (self.ai.stages.def as u8 & 15) | (u8::from(self.ai.reflect) << 4u8) | (u8::from(has_ohko_speed) << 5u8);
         u64::from_le_bytes([
             hp_low,
             hp_high,
             self.player.stages.atk as u8,
             self.player.stages.spc as u8,
-            self.player.stages.acc as u8,
-            self.ai.stages.def as u8,
+            acc_and_eva,
+            def_and_flags,
             self.ai.stages.spc as u8,
             flags,
         ])

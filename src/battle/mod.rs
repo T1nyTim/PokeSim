@@ -15,7 +15,7 @@ use crate::{
             battle::BattleState,
             key::{BattleKey, StateMap},
         },
-        turn::{Branch, PendingAction, TurnAction, TurnContext},
+        turn::{AiChoices, Branch, PendingAction, TurnAction, TurnContext},
     },
     data::{
         effects::{Effect, EffectResolution},
@@ -37,6 +37,7 @@ pub struct Battle<'battle> {
     states: StateAccumulator,
     next_actions: StateMap<PendingAction>,
     player: Combatant<'battle>,
+    player_has_ohko: bool,
     player_policy: &'battle PlayerPolicy,
     player_choices: StateMap<u64, (Option<usize>, &'static Move)>,
     ai: Combatant<'battle>,
@@ -55,6 +56,7 @@ impl<'battle> Battle<'battle> {
             states: StateAccumulator::default(),
             next_actions: StateMap::default(),
             player: player_combatant,
+            player_has_ohko: player.active.moves.iter().flatten().any(|mv| matches!(mv.effect, Effect::Ohko)),
             player_policy: &player.policy,
             player_choices: StateMap::default(),
             ai: ai_combatant,
@@ -193,10 +195,11 @@ impl<'battle> Battle<'battle> {
             self.finish_action(branch, probability);
             return;
         }
-        let (target, target_types) = match side {
-            Side::Player => (&branch.state.ai, &self.ai.pokemon.species.types),
-            Side::Ai => (&branch.state.player, &self.player.pokemon.species.types),
+        let (attacker_combatant, target_combatant, target) = match side {
+            Side::Player => (&self.player, &self.ai, &branch.state.ai),
+            Side::Ai => (&self.ai, &self.player, &branch.state.player),
         };
+        let target_types = &target_combatant.pokemon.species.types;
         if matches!(resolution, EffectResolution::Disable) && !target.can_be_disabled()
             || matches!(resolution, EffectResolution::Sleep) && !target.can_be_put_to_sleep()
             || matches!(mv.effect, Effect::Paralyze) && !target.can_be_paralyzed()
@@ -204,7 +207,14 @@ impl<'battle> Battle<'battle> {
             self.finish_action(branch, probability);
             return;
         }
-        let hit_prob = branch.turn.hit_probability(&mut branch.state, target_types);
+        let target_hp = target.hp;
+        let hit_prob = if matches!(resolution, EffectResolution::Ohko)
+            && !attacker_combatant.can_ohko(target_combatant, branch.state.combatant(side), target, mv)
+        {
+            0.0f64
+        } else {
+            branch.turn.hit_probability(&mut branch.state, target_types)
+        };
         if hit_prob == 0.0f64 {
             branch.state.miss_move();
             self.finish_action(branch, probability);
@@ -255,6 +265,7 @@ impl<'battle> Battle<'battle> {
                 let damage = mv.fixed_damage().unwrap_or_else(|| todo!("Fixed damage for {}", mv.name()));
                 self.resolve_damage(branch, probability, damage, 1);
             }
+            EffectResolution::Ohko => self.resolve_damage(branch, probability, target_hp, 1),
             EffectResolution::Sleep => {
                 let target_side = match side {
                     Side::Player => Side::Ai,
@@ -352,7 +363,7 @@ impl<'battle> Battle<'battle> {
             self.finish_action(branch, probability * wake_prob);
             return;
         }
-        if branch.state.is_trapped(side) || branch.turn.skips_action() {
+        if branch.state.combatant(side).frozen || branch.state.is_trapped(side) || branch.turn.skips_action() {
             self.finish_action(branch, probability);
             return;
         }
@@ -518,7 +529,8 @@ impl<'battle> Battle<'battle> {
         } else if state.player.rage_accuracy.is_some() {
             Some((None, &RAGE))
         } else {
-            let selection_key = state.player_selection_key();
+            let has_ohko_speed = self.player_has_ohko && self.player.has_ohko_speed(&self.ai, &state.player, &state.ai);
+            let selection_key = state.player_selection_key(has_ohko_speed);
             Some(*self.player_choices.entry(selection_key).or_insert_with(|| {
                 self.player_policy
                     .select(&self.player.pokemon.moves, state.player_pp, state.player.disabled_slot(), |mv| {
@@ -571,33 +583,5 @@ impl BattleOutcome {
             Side::Player => self.win += probability,
             Side::Ai => self.lose += probability,
         }
-    }
-}
-
-type AiChoice = ((Option<usize>, &'static Move), f64);
-
-struct AiChoices {
-    moves: [Vec<AiChoice>; 2],
-    probabilities: [f64; 2],
-}
-
-impl AiChoices {
-    fn new(choices: Vec<AiChoice>) -> Self {
-        let mut result = Self {
-            moves: array::from_fn(|_| Vec::new()),
-            probabilities: [0.0f64; 2],
-        };
-        for choice in choices {
-            let ((_, mv), probability) = choice;
-            let priority = usize::from(mv.priority());
-            result.probabilities[priority] += probability;
-            result.moves[priority].push(choice);
-        }
-        for (moves, probability) in result.moves.iter_mut().zip(result.probabilities) {
-            for (_, choice_prob) in moves {
-                *choice_prob /= probability;
-            }
-        }
-        result
     }
 }

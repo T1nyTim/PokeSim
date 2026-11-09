@@ -44,10 +44,15 @@ impl GrowthRate {
 
 #[derive(Eq, PartialEq)]
 pub enum Item {
+    Calcium,
+    Carbos,
     FireStone,
     HpUp,
+    Iron,
     LeafStone,
     MoonStone,
+    PpUp,
+    Protein,
     RareCandy,
     ThunderStone,
     Tm(&'static Move),
@@ -59,10 +64,15 @@ pub enum Item {
 impl Item {
     pub(super) const fn battle_effect(&self) -> Option<&'static Effect> {
         match self {
-            Self::FireStone
+            Self::Calcium
+            | Self::Carbos
+            | Self::FireStone
             | Self::HpUp
+            | Self::Iron
             | Self::LeafStone
             | Self::MoonStone
+            | Self::PpUp
+            | Self::Protein
             | Self::RareCandy
             | Self::ThunderStone
             | Self::Tm(_)
@@ -74,10 +84,15 @@ impl Item {
 
     pub(super) const fn name(&self) -> &'static str {
         match self {
+            Self::Calcium => "Calcium",
+            Self::Carbos => "Carbos",
             Self::FireStone => "Fire Stone",
             Self::HpUp => "HP Up",
+            Self::Iron => "Iron",
             Self::LeafStone => "Leaf Stone",
             Self::MoonStone => "Moon Stone",
+            Self::PpUp => "PP Up",
+            Self::Protein => "Protein",
             Self::RareCandy => "Rare Candy",
             Self::ThunderStone => "Thunder Stone",
             Self::Tm(mv) => mv.name(),

@@ -132,6 +132,8 @@ impl Hash for CombatantKey {
 }
 
 impl CombatantKey {
+    const FROZEN: u8 = 14;
+
     pub(super) fn new(combatant: &CombatantState) -> Self {
         let [hp_low, hp_high] = combatant.hp.to_le_bytes();
         let flags = u8::from(combatant.poisoned)
@@ -145,7 +147,13 @@ impl CombatantKey {
         let disabled = combatant.disabled.as_ref();
         let bide = combatant.bide.as_ref();
         let trapping = combatant.trapping.as_ref();
-        let status = u64::from(combatant.sleep_elapsed.unwrap_or(15))
+        let acc_and_eva = (combatant.stages.acc as u8 & 15) | ((combatant.stages.eva as u8) << 4u8);
+        let sleep = if combatant.frozen {
+            Self::FROZEN
+        } else {
+            combatant.sleep_elapsed.unwrap_or(15)
+        };
+        let status = u64::from(sleep)
             | (u64::from(combatant.confusion_elapsed.unwrap_or(7)) << 4u64)
             | (u64::from(disabled.map_or(7, |active| active.slot)) << 7u64)
             | (u64::from(disabled.map_or(0, |active| active.turns_elapsed)) << 10u64)
@@ -155,7 +163,8 @@ impl CombatantKey {
             | (u64::from(trapping.map_or(0, |active| active.turns_elapsed)) << 48u64)
             | (u64::from(trapping.is_some_and(|active| active.ends_this_turn)) << 51u64)
             | (u64::from(combatant.charging_slot.map_or(0, |slot| slot + 1)) << 52u64)
-            | (u64::from(combatant.rage_accuracy.unwrap_or(0)) << 55u64);
+            | (u64::from(combatant.rage_accuracy.unwrap_or(0)) << 55u64)
+            | (u64::from(combatant.reflect) << 63u64);
         Self {
             flags: u64::from_le_bytes([
                 hp_low,
@@ -164,7 +173,7 @@ impl CombatantKey {
                 combatant.stages.def as u8,
                 combatant.stages.spd as u8,
                 combatant.stages.spc as u8,
-                combatant.stages.acc as u8,
+                acc_and_eva,
                 flags,
             ]),
             status,
@@ -174,7 +183,8 @@ impl CombatantKey {
 
     fn hash_action_group(&self, state: &mut impl Hasher) {
         let timer_mask = 0b111_1111 | (0b1111 << 10u8);
-        self.hash_fields(state, self.flags >> u16::BITS, self.status & !timer_mask);
+        let frozen = u64::from(self.status & 15 == u64::from(Self::FROZEN));
+        self.hash_fields(state, self.flags >> u16::BITS, (self.status & !timer_mask) | frozen);
     }
 
     fn hash_fields(&self, state: &mut impl Hasher, flags: u64, status: u64) {
@@ -186,7 +196,7 @@ impl CombatantKey {
     }
 
     fn to_state(&self) -> CombatantState {
-        let [hp_low, hp_high, atk, def, spd, spc, acc, flags] = self.flags.to_le_bytes();
+        let [hp_low, hp_high, atk, def, spd, spc, acc_and_eva, flags] = self.flags.to_le_bytes();
         let sleep = (self.status & 15) as u8;
         let confusion = ((self.status >> 4u64) & 7) as u8;
         let disabled_slot = ((self.status >> 7u64) & 7) as u8;
@@ -198,7 +208,8 @@ impl CombatantKey {
                 def.cast_signed(),
                 spd.cast_signed(),
                 spc.cast_signed(),
-                acc.cast_signed(),
+                (acc_and_eva << 4u8).cast_signed() >> 4u8,
+                acc_and_eva.cast_signed() >> 4u8,
             ),
             (flags & 4 != 0).then_some(BideState::from_key(((self.status >> 14) & 3) as u8, (self.status >> 16) as u16)),
             flags & 8 != 0,
@@ -206,11 +217,13 @@ impl CombatantKey {
             (confusion != 7).then_some(confusion),
             (disabled_slot != 7).then_some(DisableState::from_key(disabled_slot, ((self.status >> 10) & 15) as u8)),
             flags & 64 != 0,
+            sleep == Self::FROZEN,
             flags & 32 != 0,
             flags & 1 != 0,
             (rage_acc != 0).then_some(rage_acc),
+            self.status >> 63u64 != 0,
             flags & 2 != 0,
-            (sleep != 15).then_some(sleep),
+            (sleep < Self::FROZEN).then_some(sleep),
             self.trapping_mv.map(|mv| {
                 TrappingState::from_key(
                     mv,

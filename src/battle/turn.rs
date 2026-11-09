@@ -1,4 +1,4 @@
-use core::cmp::Ordering;
+use core::{array, cmp::Ordering};
 
 use crate::{
     battle::{
@@ -127,9 +127,9 @@ impl TurnContext {
             return 0.0;
         }
         let probability = if matches!(mv.effect, Effect::Rage) {
-            attacker.rage_hit_probability()
+            attacker.rage_hit_probability(target.stages.eva)
         } else {
-            attacker.stages.hit_probability(mv)
+            attacker.stages.hit_probability(mv, target.stages.eva)
         };
         mv.hit_probability(probability, target_types, side == Side::Ai)
     }
@@ -164,5 +164,33 @@ impl TurnContext {
             TurnAction::Move(idx, mv) => (idx.map(usize::from), *mv),
             TurnAction::AiChoice(_, _) | TurnAction::Skip => unreachable!(),
         }
+    }
+}
+
+type AiChoice = ((Option<usize>, &'static Move), f64);
+
+pub(super) struct AiChoices {
+    pub moves: [Vec<AiChoice>; 2],
+    pub probabilities: [f64; 2],
+}
+
+impl AiChoices {
+    pub(super) fn new(choices: Vec<AiChoice>) -> Self {
+        let mut result = Self {
+            moves: array::from_fn(|_| Vec::new()),
+            probabilities: [0.0f64; 2],
+        };
+        for choice in choices {
+            let ((_, mv), probability) = choice;
+            let priority = usize::from(mv.priority());
+            result.probabilities[priority] += probability;
+            result.moves[priority].push(choice);
+        }
+        for (moves, probability) in result.moves.iter_mut().zip(result.probabilities) {
+            for (_, choice_prob) in moves {
+                *choice_prob /= probability;
+            }
+        }
+        result
     }
 }

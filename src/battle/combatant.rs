@@ -18,6 +18,16 @@ pub struct Combatant<'battle> {
 }
 
 impl<'battle> Combatant<'battle> {
+    pub(super) fn can_ohko(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> bool {
+        self.has_ohko_speed(target, state, target_state)
+            && target
+                .pokemon
+                .species
+                .types
+                .iter()
+                .all(|target_type| mv.mv_type.effectiveness(target_type) != 0)
+    }
+
     pub(super) fn confusion_damage(&self, state: &CombatantState) -> u16 {
         self.pokemon.base_damage(
             40,
@@ -31,7 +41,7 @@ impl<'battle> Combatant<'battle> {
     pub(super) fn damage_outcomes(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> DamageOutcomes {
         let cache = self.damage_rolls.get(mv).expect("A selected move must have a damage-roll cache");
         let (attack, defense) = Self::damage_stage_indices(state, target_state, mv);
-        let outcomes = &cache.staged(state, mv).outcomes[attack][defense];
+        let outcomes = &cache.staged(state, target_state, mv).outcomes[attack][defense];
         let cached = outcomes.get_or_init(|| {
             let combined = self.single_hit_outcomes(target, state, target_state, mv);
             if matches!(mv.effect, Effect::TwoToFiveAttacks) {
@@ -50,7 +60,18 @@ impl<'battle> Combatant<'battle> {
     }
 
     pub(super) fn expected_damage(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> f64 {
-        let hit_probability = state.stages.hit_probability(mv);
+        let hit_probability = if matches!(mv.effect, Effect::Swift) {
+            1.0f64
+        } else {
+            state.stages.hit_probability(mv, target_state.stages.eva)
+        };
+        if matches!(mv.effect, Effect::Ohko) {
+            return if self.can_ohko(target, state, target_state, mv) {
+                f64::from(target_state.hp) * hit_probability
+            } else {
+                0.0
+            };
+        }
         if let Some(damage) = mv.fixed_damage() {
             return f64::from(damage.min(target_state.hp)) * hit_probability;
         }
@@ -70,7 +91,7 @@ impl<'battle> Combatant<'battle> {
         }
         let cache = self.damage_rolls.get(mv).expect("A selected move must have a damage-roll cache");
         let (attack, defense) = Self::damage_stage_indices(state, target_state, mv);
-        let cached_scores = &cache.staged(state, mv).expected[attack][defense];
+        let cached_scores = &cache.staged(state, target_state, mv).expected[attack][defense];
         let scores = cached_scores.get_or_init(|| {
             let outcomes = self.damage_outcomes(target, state, target_state, mv);
             let max_damage = outcomes.last().map_or(0, |&(damage, _)| damage);
@@ -86,6 +107,10 @@ impl<'battle> Combatant<'battle> {
         });
         let expected_damage = scores[usize::from(target_state.hp).min(scores.len() - 1)] * hit_probability;
         mv.effect.damage_per_turn(expected_damage)
+    }
+
+    pub(super) fn has_ohko_speed(&self, target: &Self, state: &CombatantState, target_state: &CombatantState) -> bool {
+        state.speed(self.stats.spd) >= target_state.speed(target.stats.spd)
     }
 
     pub(super) fn new(pokemon: &'battle Pokemon, stats: Stats) -> Self {
@@ -150,7 +175,7 @@ impl<'battle> Combatant<'battle> {
         } else {
             (
                 state.physical_attack(self.stats.atk),
-                StatStages::apply(target.stats.def, target_state.stages.def),
+                StatStages::apply(target.stats.def, target_state.stages.def) * if target_state.reflect { 2 } else { 1 },
             )
         };
         let mut damage = self.pokemon.base_damage(mv.power, attack, defense, crit, &mv.effect);
@@ -185,7 +210,7 @@ impl<'battle> Combatant<'battle> {
             &cache.critical
         } else {
             let (attack, defense) = Self::damage_stage_indices(state, target_state, mv);
-            &cache.staged(state, mv).normal[attack][defense]
+            &cache.staged(state, target_state, mv).normal[attack][defense]
         };
         rolls.get_or_init(|| self.calculate_damage_rolls(target, state, target_state, mv, crit))
     }
@@ -201,6 +226,7 @@ struct DamageRollCache {
     burned_focused: OnceCell<Box<StagedDamageCache>>,
     critical: OnceCell<Vec<(u16, f64)>>,
     focused: OnceCell<Box<StagedDamageCache>>,
+    reflected: OnceCell<Box<Self>>,
 }
 
 impl DamageRollCache {
@@ -211,15 +237,22 @@ impl DamageRollCache {
             burned_focused: OnceCell::new(),
             critical: OnceCell::new(),
             focused: OnceCell::new(),
+            reflected: OnceCell::new(),
         }
     }
 
-    fn staged(&self, state: &CombatantState, mv: &Move) -> &StagedDamageCache {
-        match (state.burned && !mv.mv_type.is_special(), state.focus_energy) {
-            (false, false) => &self.normal,
-            (true, false) => self.burned.get_or_init(|| Box::new(StagedDamageCache::new())),
-            (false, true) => self.focused.get_or_init(|| Box::new(StagedDamageCache::new())),
-            (true, true) => self.burned_focused.get_or_init(|| Box::new(StagedDamageCache::new())),
+    fn staged(&self, state: &CombatantState, target: &CombatantState, mv: &Move) -> &StagedDamageCache {
+        let physical = !mv.mv_type.is_special();
+        let cache = if target.reflect && physical {
+            self.reflected.get_or_init(|| Box::new(Self::new()))
+        } else {
+            self
+        };
+        match (state.burned && physical, state.focus_energy) {
+            (false, false) => &cache.normal,
+            (true, false) => cache.burned.get_or_init(|| Box::new(StagedDamageCache::new())),
+            (false, true) => cache.focused.get_or_init(|| Box::new(StagedDamageCache::new())),
+            (true, true) => cache.burned_focused.get_or_init(|| Box::new(StagedDamageCache::new())),
         }
     }
 }
