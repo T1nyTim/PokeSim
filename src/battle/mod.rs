@@ -11,7 +11,7 @@ use crate::{
     battle::{
         combatant::Combatant,
         state::{
-            accumulator::StateAccumulator,
+            accumulator::{StateAccumulator, StateFrontier},
             battle::BattleState,
             key::{BattleKey, StateMap},
         },
@@ -83,15 +83,15 @@ impl<'battle> Battle<'battle> {
         self.outcome.unresolved = 0.0f64;
         let mut init_state = BattleState::new(&self.player, &self.ai, self.ai_item.map_or(0, |item| item.uses));
         init_state.cap_surplus_pp(self.remaining_turns);
-        self.states.entries.insert(init_state.key(), 1.0f64);
-        let mut current_states = StateMap::default();
+        self.states.frontier.entries.insert(init_state.key(), 1.0f64);
+        let mut current_states = StateFrontier::default();
         let mut batch_turns = false;
         for idx in 0..max_depth {
-            if self.states.entries.is_empty() {
+            if self.states.frontier.is_empty() {
                 break;
             }
             self.remaining_turns -= 1;
-            mem::swap(&mut current_states, &mut self.states.entries);
+            mem::swap(&mut current_states, &mut self.states.frontier);
             if self.remaining_turns > 0 && current_states.len() >= 0x0001_0000 {
                 self.states.enable_cache();
             }
@@ -100,27 +100,23 @@ impl<'battle> Battle<'battle> {
             batch_turns |= current_states.len() >= 4_096;
             if !batch_turns {
                 #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
-                for (state_key, probability) in current_states.drain() {
-                    self.start_state_turn(&state_key, probability, second_turn);
+                for (state_key, probability) in current_states.entries.drain() {
+                    self.start_state_turn(&state_key, state_key.hp_pair(), probability, second_turn);
                     self.resolve_pending_actions();
                 }
                 continue;
             }
-            let mut ordered_states: Vec<_> = current_states
-                .iter()
-                .map(|(state_key, &probability)| (state_key.action_batch_order(), state_key, probability))
-                .collect();
-            ordered_states.sort_unstable_by_key(|entry| entry.0);
+            let ordered_states = current_states.action_ordered();
             for batch in ordered_states.chunks(512) {
-                for &(_, state_key, probabillity) in batch {
-                    self.start_state_turn(state_key, probabillity, second_turn);
+                for &(order, state_key, probabillity) in batch {
+                    self.start_state_turn(state_key, order as u32, probabillity, second_turn);
                 }
                 self.resolve_pending_actions();
             }
             current_states.clear();
             self.states.flush();
         }
-        self.outcome.unresolved += self.states.entries.values().copied().fold(0.0f64, |total, prob| total + prob);
+        self.outcome.unresolved += self.states.frontier.total_probability();
         self.states.clear();
         self.outcome.clone()
     }
@@ -512,11 +508,11 @@ impl<'battle> Battle<'battle> {
         self.resolve_action(branch, probability);
     }
 
-    fn start_state_turn(&mut self, state_key: &BattleKey, probability: f64, second_turn: bool) {
+    fn start_state_turn(&mut self, state_key: &BattleKey, hp_pair: u32, probability: f64, second_turn: bool) {
         if probability == 0.0f64 {
             return;
         }
-        let state = state_key.to_state();
+        let state = state_key.to_state_with_hp(hp_pair);
         let player_move = if state.player.is_asleep() {
             None
         } else if let Some(mv) = state.player.trapping_move() {

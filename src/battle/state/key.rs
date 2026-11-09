@@ -22,19 +22,31 @@ impl BattleKey {
         self.ai.hash_action_group(&mut hasher);
         hasher.write_u64(self.pp_damage_and_items);
         let group = hasher.finish() & (u64::from(u32::MAX) << u32::BITS);
+        group | u64::from(self.hp_pair())
+    }
+
+    pub(crate) fn hp_pair(&self) -> u32 {
         let hp_mask = u64::from(u16::MAX);
-        (group + ((self.player.flags & hp_mask) << u16::BITS)) | (self.ai.flags & hp_mask)
+        (((self.player.flags & hp_mask) << u16::BITS) | (self.ai.flags & hp_mask)) as u32
     }
 
     pub(crate) fn to_state(&self) -> BattleState {
+        self.to_state_with_hp(self.hp_pair())
+    }
+
+    pub(crate) fn to_state_with_hp(&self, hp_pair: u32) -> BattleState {
         let [pp1, pp2, pp3, pp4, dmg_low, dmg_high, ai_items_left, _] = self.pp_damage_and_items.to_le_bytes();
         BattleState::from_key(
-            self.player.to_state(),
-            self.ai.to_state(),
+            self.player.to_state((hp_pair >> u16::BITS) as u16),
+            self.ai.to_state(hp_pair as u16),
             [pp1, pp2, pp3, pp4],
             u16::from_le_bytes([dmg_low, dmg_high]),
             ai_items_left,
         )
+    }
+
+    pub(super) const fn batch_order_with_hp_offset(order: u64, offset: u64) -> u64 {
+        order | ((offset >> 4) << u16::BITS) | (offset & 15)
     }
 
     pub(super) const fn into_hp_tile(mut self) -> (Self, usize) {
@@ -50,13 +62,6 @@ impl BattleKey {
             ai,
             pp_damage_and_items,
         }
-    }
-
-    pub(super) fn with_hp_offset(&self, offset: usize) -> Self {
-        let mut restored = self.clone();
-        restored.player.flags |= (offset >> 4u8) as u64;
-        restored.ai.flags |= (offset & 15) as u64;
-        restored
     }
 }
 
@@ -195,14 +200,14 @@ impl CombatantKey {
         }
     }
 
-    fn to_state(&self) -> CombatantState {
-        let [hp_low, hp_high, atk, def, spd, spc, acc_and_eva, flags] = self.flags.to_le_bytes();
+    fn to_state(&self, hp: u16) -> CombatantState {
+        let [_, _, atk, def, spd, spc, acc_and_eva, flags] = self.flags.to_le_bytes();
         let sleep = (self.status & 15) as u8;
         let confusion = ((self.status >> 4u64) & 7) as u8;
         let disabled_slot = ((self.status >> 7u64) & 7) as u8;
         let rage_acc = (self.status >> 55u64) as u8;
         CombatantState::from_key(
-            u16::from_le_bytes([hp_low, hp_high]),
+            hp,
             StatStages::new(
                 atk.cast_signed(),
                 def.cast_signed(),
