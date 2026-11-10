@@ -47,15 +47,20 @@ impl BattleKey {
         )
     }
 
-    pub(super) const fn batch_order_with_hp_offset(order: u64, offset: u64) -> u64 {
-        order | ((offset >> 4) << u16::BITS) | (offset & 15)
+    pub(super) const fn batch_order_with_hp_offset(order: u64, block_idx: usize, cell_idx: usize) -> u64 {
+        let player_hp = (block_idx & 0b1100) | (cell_idx >> 2usize);
+        let ai_hp = ((block_idx & 3) << 2usize) | (cell_idx & 3);
+        order | ((player_hp as u64) << u16::BITS) | ai_hp as u64
     }
 
-    pub(super) const fn into_hp_tile(mut self) -> (Self, usize) {
-        let offset = (((self.player.flags & 15) << 4u8) | (self.ai.flags & 15)) as usize;
+    pub(super) const fn into_hp_tile(mut self) -> (Self, usize, usize) {
+        let player_hp = self.player.flags as usize & 15;
+        let ai_hp = self.ai.flags as usize & 15;
+        let block_idx = (player_hp & 0b1100) | (ai_hp >> 2usize);
+        let cell_idx = ((player_hp & 3) << 2usize) | (ai_hp & 3);
         self.player.flags &= !15;
         self.ai.flags &= !15;
-        (self, offset)
+        (self, block_idx, cell_idx)
     }
 
     pub(super) const fn new(player: CombatantKey, ai: CombatantKey, battle_data: u64) -> Self {
