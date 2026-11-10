@@ -148,9 +148,12 @@ impl BattleState {
         if side == Side::Player
             && let Some(idx) = slot
         {
-            self.player_pp[idx] = self.player_pp[idx]
-                .checked_sub(1)
-                .expect("The player's selected move must have PP remaining");
+            let pp = &mut self.player_pp[idx];
+            *pp = if *pp == 0 && matches!(effect, Effect::HyperBeam) {
+                63
+            } else {
+                pp.checked_sub(1).expect("The player's selected move must have PP remaining")
+            };
         }
         if !effect.preserves_last_damage() {
             self.last_damage = 0;
@@ -208,10 +211,16 @@ impl BattleState {
     }
 
     pub(crate) fn key(&self) -> BattleKey {
+        let battle_flags = self.player.recharge_slot.map_or(0, |slot| slot + 1)
+            | (self.ai.recharge_slot.map_or(0, |slot| slot + 1) << 3u8)
+            | (u8::from(self.player.mist) << 6u8)
+            | (u8::from(self.ai.mist) << 7u8);
+        let [pp1, pp2, pp3, pp4] = self.player_pp;
+        let [dmg_low, dmg_high] = self.last_damage.to_le_bytes();
         BattleKey::new(
             CombatantKey::new(&self.player),
             CombatantKey::new(&self.ai),
-            u64::from(u32::from_le_bytes(self.player_pp)) | (u64::from(self.last_damage) << 32) | (u64::from(self.ai_items_left) << 48),
+            u64::from_le_bytes([pp1, pp2, pp3, pp4, dmg_low, dmg_high, self.ai_items_left, battle_flags]),
         )
     }
 
@@ -253,8 +262,13 @@ impl BattleState {
         ])
     }
 
-    pub(crate) fn use_ai_item(&mut self, item: &TrainerItem) {
-        item.effect.apply_status(&mut self.ai.stages);
+    pub(crate) fn use_ai_item(&mut self, item: &TrainerItem, ai_types: &[Type; 2], max_hp: u16) {
+        if let Some(amount) = item.heal_amount() {
+            self.ai.heal(amount, max_hp);
+        } else {
+            let effect = item.effect().expect("A trainer item without healing must have a battle effect");
+            effect.apply_primary(&mut self.ai, ai_types);
+        }
         self.ai_items_left -= 1;
     }
 

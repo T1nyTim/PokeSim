@@ -53,6 +53,7 @@ impl Player {
         // Doesn't feel like the right place to keep this
         let used = match item {
             Item::Calcium | Item::Carbos | Item::HpUp | Item::Iron | Item::Protein => self.stat_exp.use_vitamin(item),
+            Item::GuardSpec | Item::HyperPotion | Item::SuperPotion | Item::XDefend | Item::XSpeed => false,
             Item::PpUp => self.active.use_pp_up(&self.policy, &self.stat_exp),
             Item::RareCandy => {
                 if self.active.level >= 100 {
@@ -65,7 +66,6 @@ impl Player {
                 true
             }
             Item::Tm(mv) => self.active.learn_tm(mv, &self.policy, &self.stat_exp),
-            Item::XDefend | Item::XSpeed => false,
             Item::FireStone | Item::LeafStone | Item::MoonStone | Item::ThunderStone | Item::WaterStone => todo!(),
         };
         if used {
@@ -98,10 +98,13 @@ impl StatExp {
             Item::Iron => &mut self.def,
             Item::Protein => &mut self.atk,
             Item::FireStone
+            | Item::GuardSpec
+            | Item::HyperPotion
             | Item::LeafStone
             | Item::MoonStone
             | Item::PpUp
             | Item::RareCandy
+            | Item::SuperPotion
             | Item::ThunderStone
             | Item::Tm(_)
             | Item::WaterStone

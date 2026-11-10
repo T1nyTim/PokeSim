@@ -6,7 +6,7 @@ use crate::{
 };
 
 // pub const AGATHA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const BEAUTY: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+pub const BEAUTY: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 // pub const BIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const BIRD_KEEPER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const BLACKBELT: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
@@ -16,15 +16,15 @@ pub const BROCK: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const BUG_CATCHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const BURGLAR: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 // pub const CHANNELER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const COOLTRAINER_F: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+pub const COOLTRAINER_F: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 // pub const COOLTRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 // pub const CUE_BALL: &[AiPolicy] = &[];
 pub const ENGINEER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const ERIKA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+pub const ERIKA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const FISHER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const GAMBLER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const GENTLEMAN: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::IncreaseEffect];
-// pub const GIOVANNI: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
+pub const GIOVANNI: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const HIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const JR_TRAINER_F: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const JR_TRAINER_M: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
@@ -218,8 +218,8 @@ impl GameAi {
         choices.into_iter().map(|choice| (choice, probability)).collect()
     }
 
-    const fn with_item(&mut self, item: &Item, probability: f64, uses: u8) {
-        self.item = Some(TrainerItem::new(item, probability, uses));
+    const fn with_item(&mut self, item: &'static Item, probability: f64, uses: u8, hp_divisor: Option<u16>) {
+        self.item = Some(TrainerItem::new(item, probability, uses, hp_divisor));
     }
 }
 
@@ -230,8 +230,13 @@ pub struct MatchupGroup {
 }
 
 impl MatchupGroup {
-    pub(super) const fn with_item(mut self, item: &Item, probability: f64, uses: u8) -> Self {
-        self.ai.with_item(item, probability, uses);
+    pub(super) const fn with_item(mut self, item: &'static Item, probability: f64, uses: u8) -> Self {
+        self.ai.with_item(item, probability, uses, None);
+        self
+    }
+
+    pub(super) const fn with_item_hp_threshold(mut self, item: &'static Item, probability: f64, uses: u8, divisor: u16) -> Self {
+        self.ai.with_item(item, probability, uses, Some(divisor));
         self
     }
 
@@ -265,21 +270,39 @@ impl MatchupGroup {
 }
 
 pub struct TrainerItem {
-    pub effect: &'static Effect,
+    item: &'static Item,
     probability: f64,
     pub uses: u8,
+    hp_divisor: Option<u16>,
 }
 
 impl TrainerItem {
-    pub(super) const fn use_probability(&self, remaining: u8) -> f64 {
-        if remaining == 0 { 0.0 } else { self.probability }
+    pub(super) const fn effect(&self) -> Option<&'static Effect> {
+        self.item.battle_effect()
     }
 
-    const fn new(item: &Item, probability: f64, uses: u8) -> Self {
+    pub(super) const fn heal_amount(&self) -> Option<u16> {
+        self.item.battle_heal_amount()
+    }
+
+    pub(super) const fn use_probability(&self, remaining: u8, hp: u16, max_hp: u16) -> f64 {
+        if remaining == 0 {
+            return 0.0;
+        }
+        if let Some(divisor) = self.hp_divisor
+            && hp >= max_hp / divisor
+        {
+            return 0.0;
+        }
+        self.probability
+    }
+
+    const fn new(item: &'static Item, probability: f64, uses: u8, hp_divisor: Option<u16>) -> Self {
         Self {
-            effect: item.battle_effect().expect("A trainer item must have a supported battled effect"),
+            item,
             probability,
             uses,
+            hp_divisor,
         }
     }
 }

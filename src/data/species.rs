@@ -168,6 +168,22 @@ pub const ELECTRODE: Species = Species::new(
     &[],
     &[(17, &SONICBOOM), (22, &SELFDESTRUCT), (29, &LIGHT_SCREEN), (40, &SWIFT), (50, &EXPLOSION)]
 );
+pub const EXEGGCUTE: Species = Species::new(
+    SpeciesKind::Exeggcute, BaseStats::new(60, 40, 80, 40, 60), [Type::Grass, Type::Psychic], 98,
+    [Some(&BARRAGE), Some(&HYPNOSIS), None, None], GrowthRate::Slow,
+    &[&TOXIC, &TAKE_DOWN, &DOUBLE_EDGE, &RAGE, &PSYCHIC, &TELEPORT, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &SELFDESTRUCT, &EGG_BOMB, &REST, &PSYWAVE,
+        &EXPLOSION, &SUBSTITUTE],
+    &[(Evolve::Item(Item::LeafStone), &EXEGGUTOR)],
+    &[(25, &REFLECT), (28, &LEECH_SEED), (32, &STUN_SPORE), (37, &POISONPOWDER), (42, &SOLARBEAM), (48, &SLEEP_POWDER)]
+);
+pub const EXEGGUTOR: Species = Species::new(
+    SpeciesKind::Exeggutor, BaseStats::new(95, 95, 85, 55, 125), [Type::Grass, Type::Psychic], 212,
+    [Some(&BARRAGE), Some(&HYPNOSIS), None, None], GrowthRate::Slow,
+    &[&TOXIC, &TAKE_DOWN, &DOUBLE_EDGE, &HYPER_BEAM, &RAGE, &MEGA_DRAIN, &SOLARBEAM, &PSYCHIC, &TELEPORT, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE,
+        &SELFDESTRUCT, &EGG_BOMB, &REST, &PSYWAVE, &EXPLOSION, &SUBSTITUTE],
+    &[],
+    &[(28, &STOMP)]
+);
 pub const FEAROW: Species = Species::new(
     SpeciesKind::Fearow, BaseStats::new(65, 90, 65, 100, 61), [Type::Normal, Type::Flying], 162,
     [Some(&PECK), Some(&GROWL), Some(&LEER), None], GrowthRate::MediumFast,
@@ -279,6 +295,15 @@ pub const KAKUNA: Species = Species::new(
     &[],
     &[(Evolve::Level(10), &BEEDRILL)],
     &[]
+);
+pub const KANGASKHAN: Species = Species::new(
+    SpeciesKind::Kangaskhan, BaseStats::new(105, 95, 80, 90, 40), [Type::Normal, Type::Normal], 175,
+    [Some(&COMET_PUNCH), Some(&RAGE), None, None], GrowthRate::MediumFast,
+    &[&MEGA_PUNCH, &MEGA_KICK, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &HYPER_BEAM, &SUBMISSION,
+        &COUNTER, &SEISMIC_TOSS, &RAGE, &THUNDERBOLT, &THUNDER, &EARTHQUAKE, &FISSURE, &MIMIC, &DOUBLE_TEAM, &BIDE, &FIRE_BLAST, &SKULL_BASH, &REST,
+        &ROCK_SLIDE, &SUBSTITUTE],
+    &[],
+    &[(26, &BITE), (31, &TAIL_WHIP), (36, &MEGA_PUNCH), (41, &LEER), (46, &DIZZY_PUNCH)]
 );
 pub const KOFFING: Species = Species::new(
     SpeciesKind::Koffing, BaseStats::new(40, 65, 95, 35, 60), [Type::Poison, Type::Poison], 114,
@@ -558,6 +583,23 @@ pub const RATTATA: Species = Species::new(
     &[(Evolve::Level(20), &RATICATE)],
     &[(7, &QUICK_ATTACK), (14, &HYPER_FANG), (27, &FOCUS_ENERGY), (41, &SUPER_FANG)]
 );
+pub const RHYDON: Species = Species::new(
+    SpeciesKind::Rhydon, BaseStats::new(105, 130, 120, 40, 45), [Type::Ground, Type::Rock], 204,
+    [Some(&HORN_ATTACK), Some(&STOMP), Some(&TAIL_WHIP), Some(&FURY_ATTACK)], GrowthRate::Slow,
+    &[&MEGA_PUNCH, &MEGA_KICK, &TOXIC, &HORN_DRILL, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &HYPER_BEAM,
+        &PAY_DAY, &SUBMISSION, &COUNTER, &SEISMIC_TOSS, &RAGE, &THUNDERBOLT, &THUNDER, &EARTHQUAKE, &FISSURE, &DIG, &MIMIC, &DOUBLE_TEAM, &BIDE,
+        &FIRE_BLAST, &SKULL_BASH, &REST, &ROCK_SLIDE, &SUBSTITUTE],
+    &[],
+    &[(30, &STOMP), (35, &TAIL_WHIP), (40, &FURY_ATTACK), (48, &HORN_DRILL), (55, &LEER), (64, &TAKE_DOWN)]
+);
+pub const RHYHORN: Species = Species::new(
+    SpeciesKind::Rhyhorn, BaseStats::new(80, 85, 95, 25, 30), [Type::Ground, Type::Rock], 135,
+    [Some(&HORN_ATTACK), None, None, None], GrowthRate::Slow,
+    &[&TOXIC, &HORN_DRILL, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &RAGE, &THUNDERBOLT, &THUNDER, &EARTHQUAKE, &FISSURE, &DIG, &MIMIC, &DOUBLE_TEAM, &BIDE,
+        &FIRE_BLAST, &SKULL_BASH, &REST, &ROCK_SLIDE, &SUBSTITUTE],
+    &[(Evolve::Level(42), &RHYDON)],
+    &[(30, &STOMP), (35, &TAIL_WHIP), (40, &FURY_ATTACK), (45, &HORN_DRILL), (50, &LEER), (55, &TAKE_DOWN)]
+);
 pub const SANDSHREW: Species = Species::new(
     SpeciesKind::Sandshrew, BaseStats::new(50, 75, 85, 40, 30), [Type::Ground, Type::Ground], 93,
     [Some(&SCRATCH), None, None, None], GrowthRate::MediumFast,
@@ -646,6 +688,14 @@ pub const STARYU: Species = Species::new(
         &DOUBLE_TEAM, &REFLECT, &BIDE, &SWIFT, &SKULL_BASH, &REST, &THUNDER_WAVE, &PSYWAVE, &TRI_ATTACK, &SUBSTITUTE],
     &[(Evolve::Item(Item::WaterStone), &STARMIE)],
     &[(17, &WATER_GUN), (22, &HARDEN), (27, &RECOVER), (32, &SWIFT), (37, &MINIMIZE), (42, &LIGHT_SCREEN), (52, &HYDRO_PUMP)]
+);
+pub const TANGELA: Species = Species::new(
+    SpeciesKind::Tangela, BaseStats::new(65, 55, 115, 60, 100), [Type::Grass, Type::Grass], 166,
+    [Some(&CONSTRICT), Some(&BIND), None, None], GrowthRate::MediumFast,
+    &[&SWORDS_DANCE, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &HYPER_BEAM, &RAGE, &MEGA_DRAIN, &SOLARBEAM, &MIMIC, &DOUBLE_TEAM, &BIDE,
+        &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[],
+    &[(29, &ABSORB), (32, &POISONPOWDER), (36, &STUN_SPORE), (39, &SLEEP_POWDER), (45, &SLAM), (49, &GROWTH)]
 );
 pub const TENTACOOL: Species = Species::new(
     SpeciesKind::Tentacool, BaseStats::new(40, 40, 35, 70, 100), [Type::Water, Type::Poison], 105,

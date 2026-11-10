@@ -2,7 +2,7 @@ use core::hash::{BuildHasherDefault, Hash, Hasher};
 use std::collections::HashMap;
 
 use crate::{
-    battle::state::{BideState, CombatantState, DisableState, StatStages, TrappingState, battle::BattleState},
+    battle::state::{BideState, CombatantState, DisableState, RampageState, StatStages, TrappingState, battle::BattleState},
     data::move_data::Move,
 };
 
@@ -12,7 +12,7 @@ pub type StateMap<K, V = f64> = HashMap<K, V, BuildHasherDefault<StateHasher>>;
 pub struct BattleKey {
     player: CombatantKey,
     ai: CombatantKey,
-    pp_damage_and_items: u64,
+    battle_data: u64,
 }
 
 impl BattleKey {
@@ -20,7 +20,7 @@ impl BattleKey {
         let mut hasher = StateHasher::default();
         self.player.hash_action_group(&mut hasher);
         self.ai.hash_action_group(&mut hasher);
-        hasher.write_u64(self.pp_damage_and_items);
+        hasher.write_u64(self.battle_data);
         let group = hasher.finish() & (u64::from(u32::MAX) << u32::BITS);
         group | u64::from(self.hp_pair())
     }
@@ -35,10 +35,12 @@ impl BattleKey {
     }
 
     pub(crate) fn to_state_with_hp(&self, hp_pair: u32) -> BattleState {
-        let [pp1, pp2, pp3, pp4, dmg_low, dmg_high, ai_items_left, _] = self.pp_damage_and_items.to_le_bytes();
+        let [pp1, pp2, pp3, pp4, dmg_low, dmg_high, ai_items_left, battle_flags] = self.battle_data.to_le_bytes();
         BattleState::from_key(
-            self.player.to_state((hp_pair >> u16::BITS) as u16),
-            self.ai.to_state(hp_pair as u16),
+            self.player
+                .to_state((hp_pair >> u16::BITS) as u16, (battle_flags & 7).checked_sub(1), battle_flags & 0x40 != 0),
+            self.ai
+                .to_state(hp_pair as u16, ((battle_flags >> 3) & 7).checked_sub(1), battle_flags & 0x80 != 0),
             [pp1, pp2, pp3, pp4],
             u16::from_le_bytes([dmg_low, dmg_high]),
             ai_items_left,
@@ -56,12 +58,8 @@ impl BattleKey {
         (self, offset)
     }
 
-    pub(super) const fn new(player: CombatantKey, ai: CombatantKey, pp_damage_and_items: u64) -> Self {
-        Self {
-            player,
-            ai,
-            pp_damage_and_items,
-        }
+    pub(super) const fn new(player: CombatantKey, ai: CombatantKey, battle_data: u64) -> Self {
+        Self { player, ai, battle_data }
     }
 }
 
@@ -151,6 +149,7 @@ impl CombatantKey {
             | (u8::from(combatant.underground) << 7u8);
         let disabled = combatant.disabled.as_ref();
         let bide = combatant.bide.as_ref();
+        let locked_move_data = bide.map_or_else(|| combatant.rampage.as_ref().map_or(0, RampageState::key), |active| active.damage);
         let trapping = combatant.trapping.as_ref();
         let acc_and_eva = (combatant.stages.acc as u8 & 15) | ((combatant.stages.eva as u8) << 4u8);
         let sleep = if combatant.frozen {
@@ -163,7 +162,7 @@ impl CombatantKey {
             | (u64::from(disabled.map_or(7, |active| active.slot)) << 7u64)
             | (u64::from(disabled.map_or(0, |active| active.turns_elapsed)) << 10u64)
             | (u64::from(bide.map_or(0, |active| active.turns_left)) << 14u64)
-            | (u64::from(bide.map_or(0, |active| active.damage)) << 16u64)
+            | (u64::from(locked_move_data) << 16u64)
             | (u64::from(trapping.map_or(0, |active| active.damage)) << 32u64)
             | (u64::from(trapping.map_or(0, |active| active.turns_elapsed)) << 48u64)
             | (u64::from(trapping.is_some_and(|active| active.ends_this_turn)) << 51u64)
@@ -200,12 +199,14 @@ impl CombatantKey {
         }
     }
 
-    fn to_state(&self, hp: u16) -> CombatantState {
+    fn to_state(&self, hp: u16, recharge_slot: Option<u8>, mist: bool) -> CombatantState {
         let [_, _, atk, def, spd, spc, acc_and_eva, flags] = self.flags.to_le_bytes();
         let sleep = (self.status & 15) as u8;
         let confusion = ((self.status >> 4u64) & 7) as u8;
         let disabled_slot = ((self.status >> 7u64) & 7) as u8;
         let rage_acc = (self.status >> 55u64) as u8;
+        let locked_move_data = (self.status >> 16u64) as u16;
+        let is_biding = flags & 4 != 0;
         CombatantState::from_key(
             hp,
             StatStages::new(
@@ -216,16 +217,19 @@ impl CombatantKey {
                 (acc_and_eva << 4u8).cast_signed() >> 4u8,
                 acc_and_eva.cast_signed() >> 4u8,
             ),
-            (flags & 4 != 0).then_some(BideState::from_key(((self.status >> 14) & 3) as u8, (self.status >> 16) as u16)),
+            is_biding.then_some(BideState::from_key(((self.status >> 14) & 3) as u8, locked_move_data)),
             flags & 8 != 0,
             (((self.status >> 52) & 7) as u8).checked_sub(1),
             (confusion != 7).then_some(confusion),
             (disabled_slot != 7).then_some(DisableState::from_key(disabled_slot, ((self.status >> 10) & 15) as u8)),
             flags & 64 != 0,
             sleep == Self::FROZEN,
+            mist,
             flags & 32 != 0,
             flags & 1 != 0,
             (rage_acc != 0).then_some(rage_acc),
+            (!is_biding && locked_move_data != 0).then_some(RampageState::from_key(locked_move_data)),
+            recharge_slot,
             self.status >> 63u64 != 0,
             flags & 2 != 0,
             (sleep < Self::FROZEN).then_some(sleep),

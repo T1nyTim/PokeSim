@@ -47,13 +47,16 @@ pub enum Item {
     Calcium,
     Carbos,
     FireStone,
+    GuardSpec,
     HpUp,
+    HyperPotion,
     Iron,
     LeafStone,
     MoonStone,
     PpUp,
     Protein,
     RareCandy,
+    SuperPotion,
     ThunderStone,
     Tm(&'static Move),
     WaterStone,
@@ -68,15 +71,18 @@ impl Item {
             | Self::Carbos
             | Self::FireStone
             | Self::HpUp
+            | Self::HyperPotion
             | Self::Iron
             | Self::LeafStone
             | Self::MoonStone
             | Self::PpUp
             | Self::Protein
             | Self::RareCandy
+            | Self::SuperPotion
             | Self::ThunderStone
             | Self::Tm(_)
             | Self::WaterStone => None,
+            Self::GuardSpec => Some(&Effect::Mist),
             Self::XDefend => Some(&Effect::DefenseUp1),
             Self::XSpeed => Some(&Effect::SpeedUp),
         }
@@ -87,18 +93,44 @@ impl Item {
             Self::Calcium => "Calcium",
             Self::Carbos => "Carbos",
             Self::FireStone => "Fire Stone",
+            Self::GuardSpec => "Guard Spec.",
             Self::HpUp => "HP Up",
+            Self::HyperPotion => "Hyper Potion",
             Self::Iron => "Iron",
             Self::LeafStone => "Leaf Stone",
             Self::MoonStone => "Moon Stone",
             Self::PpUp => "PP Up",
             Self::Protein => "Protein",
             Self::RareCandy => "Rare Candy",
+            Self::SuperPotion => "Super Potion",
             Self::ThunderStone => "Thunder Stone",
             Self::Tm(mv) => mv.name(),
             Self::WaterStone => "Water Stone",
             Self::XDefend => "X Defend",
             Self::XSpeed => "X Speed",
+        }
+    }
+
+    pub(super) const fn battle_heal_amount(&self) -> Option<u16> {
+        match self {
+            Self::HyperPotion => Some(200),
+            Self::SuperPotion => Some(50),
+            Self::Calcium
+            | Self::Carbos
+            | Self::FireStone
+            | Self::GuardSpec
+            | Self::HpUp
+            | Self::Iron
+            | Self::LeafStone
+            | Self::MoonStone
+            | Self::PpUp
+            | Self::Protein
+            | Self::RareCandy
+            | Self::ThunderStone
+            | Self::Tm(_)
+            | Self::WaterStone
+            | Self::XDefend
+            | Self::XSpeed => None,
         }
     }
 }
@@ -125,6 +157,8 @@ pub enum SpeciesKind {
     Dugtrio,
     Ekans,
     Electrode,
+    Exeggcute,
+    Exeggutor,
     Fearow,
     Geodude,
     Gloom,
@@ -139,6 +173,7 @@ pub enum SpeciesKind {
     Jigglypuff,
     Kadabra,
     Kakuna,
+    Kangaskhan,
     Koffing,
     Machoke,
     Machop,
@@ -174,6 +209,8 @@ pub enum SpeciesKind {
     Rapidash,
     Raticate,
     Rattata,
+    Rhydon,
+    Rhyhorn,
     Sandshrew,
     Sandslash,
     Seadra,
@@ -185,6 +222,7 @@ pub enum SpeciesKind {
     Squirtle,
     Starmie,
     Staryu,
+    Tangela,
     Tentacool,
     Tentacruel,
     Venomoth,
@@ -226,6 +264,8 @@ impl SpeciesKind {
             Self::Dugtrio => "Dugtrio",
             Self::Ekans => "Ekans",
             Self::Electrode => "Electrode",
+            Self::Exeggcute => "Exeggcute",
+            Self::Exeggutor => "Exeggutor",
             Self::Fearow => "Fearow",
             Self::Geodude => "Geodude",
             Self::Gloom => "Gloom",
@@ -240,6 +280,7 @@ impl SpeciesKind {
             Self::Jigglypuff => "Jigglypuff",
             Self::Kadabra => "Kadabra",
             Self::Kakuna => "Kakuna",
+            Self::Kangaskhan => "Kangaskhan",
             Self::Koffing => "Koffing",
             Self::Machoke => "Machoke",
             Self::Machop => "Machop",
@@ -275,6 +316,8 @@ impl SpeciesKind {
             Self::Rapidash => "Rapidash",
             Self::Raticate => "Raticate",
             Self::Rattata => "Rattata",
+            Self::Rhydon => "Rhydon",
+            Self::Rhyhorn => "Rhyhorn",
             Self::Sandshrew => "Sandshrew",
             Self::Sandslash => "Sandslash",
             Self::Seadra => "Seadra",
@@ -286,6 +329,7 @@ impl SpeciesKind {
             Self::Squirtle => "Squirtle",
             Self::Starmie => "Starmie",
             Self::Staryu => "Staryu",
+            Self::Tangela => "Tangela",
             Self::Tentacool => "Tentacool",
             Self::Tentacruel => "Tentacruel",
             Self::Venomoth => "Venomoth",

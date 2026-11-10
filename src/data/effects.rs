@@ -42,6 +42,7 @@ pub enum Effect {
     LightScreen,
     Metronome,
     Mimic,
+    Mist,
     MirrorMove,
     Ohko,
     Paralyze,
@@ -130,7 +131,7 @@ impl Effect {
     pub(crate) const fn preserves_last_damage(&self) -> bool {
         matches!(
             self,
-            Self::Confusion | Self::FocusEnergy | Self::LeechSeed | Self::Paralyze | Self::Poison
+            Self::Confusion | Self::FocusEnergy | Self::LeechSeed | Self::Paralyze | Self::Poison | Self::Reflect
         )
     }
 
@@ -149,6 +150,7 @@ impl Effect {
             | Self::Flinch1
             | Self::Flinch2
             | Self::FreezeSide
+            | Self::HyperBeam
             | Self::NoEffect
             | Self::ParalyzeSide1
             | Self::ParalyzeSide2
@@ -160,6 +162,7 @@ impl Effect {
             | Self::SpecialDownSide
             | Self::SpeedDownSide
             | Self::Swift
+            | Self::ThrashPetalDance
             | Self::Trapping
             | Self::Twineedle
             | Self::TwoToFiveAttacks => EffectResolution::Damage,
@@ -179,6 +182,7 @@ impl Effect {
             | Self::EvasionUp
             | Self::FocusEnergy
             | Self::LeechSeed
+            | Self::Mist
             | Self::Paralyze
             | Self::Poison
             | Self::Reflect
@@ -187,15 +191,7 @@ impl Effect {
             | Self::SpeedDown
             | Self::SpeedUp => EffectResolution::Status,
             Self::SwitchAndTeleport => EffectResolution::SwitchOrEscape,
-            Self::AttackTwice
-            | Self::DreamEater
-            | Self::Haze
-            | Self::Heal
-            | Self::HyperBeam
-            | Self::LightScreen
-            | Self::Metronome
-            | Self::Substitute
-            | Self::ThrashPetalDance => todo!(),
+            Self::AttackTwice | Self::DreamEater | Self::Haze | Self::Heal | Self::LightScreen | Self::Metronome | Self::Substitute => todo!(),
         }
     }
 
@@ -211,6 +207,7 @@ impl Effect {
                 | Self::FocusEnergy
                 | Self::Heal
                 | Self::LightScreen
+                | Self::Mist
                 | Self::Reflect
                 | Self::SpecialUp1
                 | Self::SpecialUp2
@@ -224,6 +221,7 @@ impl Effect {
             Self::Confusion => target.confuse(),
             Self::FocusEnergy => target.focus_energy = true,
             Self::LeechSeed => target.seed(target_types),
+            Self::Mist => target.mist = true,
             Self::Paralyze => {
                 if target.can_be_paralyzed() {
                     target.paralyze();
@@ -235,6 +233,7 @@ impl Effect {
                 }
             }
             Self::Reflect => target.reflect = true,
+            Self::AccuracyDown | Self::AttackDown | Self::DefenseDown1 | Self::DefenseDown2 | Self::SpeedDown if target.mist => {}
             Self::AttackDownSide
             | Self::AccuracyDown
             | Self::AttackDown
@@ -337,6 +336,7 @@ impl Effect {
             | Self::Metronome
             | Self::Mimic
             | Self::MirrorMove
+            | Self::Mist
             | Self::Ohko
             | Self::Paralyze
             | Self::PayDay
@@ -358,70 +358,6 @@ impl Effect {
             | Self::Trapping
             | Self::Twineedle
             | Self::TwoToFiveAttacks => unreachable!("Only supported secondary effects can be applied"),
-        }
-    }
-
-    pub(crate) fn apply_status(&self, stages: &mut StatStages) {
-        match *self {
-            Self::AccuracyDown => stages.acc = (stages.acc - 1).max(-6),
-            Self::AttackDown | Self::AttackDownSide => stages.atk = (stages.atk - 1).max(-6),
-            Self::AttackUp1 => stages.atk = (stages.atk + 1).min(6),
-            Self::AttackUp2 => stages.atk = (stages.atk + 2).min(6),
-            Self::DefenseDown1 | Self::DefenseDownSide => stages.def = (stages.def - 1).max(-6),
-            Self::DefenseDown2 => stages.def = (stages.def - 2).max(-6),
-            Self::DefenseUp1 => stages.def = (stages.def + 1).min(6),
-            Self::DefenseUp2 => stages.def = (stages.def + 2).min(6),
-            Self::EvasionUp => stages.eva = (stages.eva + 1).min(6),
-            Self::SpecialDownSide => stages.spc = (stages.spc - 1).max(-6),
-            Self::SpecialUp1 => stages.spc = (stages.spc + 1).min(6),
-            Self::SpecialUp2 => stages.spc = (stages.spc + 2).min(6),
-            Self::SpeedDown | Self::SpeedDownSide => stages.spd = (stages.spd - 1).max(-6),
-            Self::SpeedUp => stages.spd = (stages.spd + 1).min(6),
-            Self::AttackTwice
-            | Self::Bide
-            | Self::BurnSide1
-            | Self::BurnSide2
-            | Self::Charge
-            | Self::Confusion
-            | Self::ConfusionSide
-            | Self::Disable
-            | Self::DrainHp
-            | Self::DreamEater
-            | Self::Explode
-            | Self::Flinch1
-            | Self::Flinch2
-            | Self::FocusEnergy
-            | Self::FreezeSide
-            | Self::Haze
-            | Self::Heal
-            | Self::HyperBeam
-            | Self::LeechSeed
-            | Self::LightScreen
-            | Self::Metronome
-            | Self::Mimic
-            | Self::MirrorMove
-            | Self::NoEffect
-            | Self::Ohko
-            | Self::Paralyze
-            | Self::ParalyzeSide1
-            | Self::ParalyzeSide2
-            | Self::PayDay
-            | Self::Poison
-            | Self::PoisonSide1
-            | Self::PoisonSide2
-            | Self::Rage
-            | Self::Recoil
-            | Self::Reflect
-            | Self::Sleep
-            | Self::SpecialDamage
-            | Self::Substitute
-            | Self::SuperFang
-            | Self::Swift
-            | Self::SwitchAndTeleport
-            | Self::ThrashPetalDance
-            | Self::Trapping
-            | Self::Twineedle
-            | Self::TwoToFiveAttacks => unreachable!(),
         }
     }
 
@@ -510,6 +446,7 @@ impl Effect {
             | Self::Metronome
             | Self::Mimic
             | Self::MirrorMove
+            | Self::Mist
             | Self::Ohko
             | Self::NoEffect
             | Self::Paralyze
@@ -582,9 +519,10 @@ impl Effect {
             | Self::SpecialDownSide
             | Self::SpeedDownSide
             | Self::SuperFang
+            | Self::ThrashPetalDance
             | Self::Trapping
             | Self::TwoToFiveAttacks => probability,
-            Self::AttackTwice | Self::Haze | Self::Metronome | Self::MirrorMove | Self::SpeedUp | Self::ThrashPetalDance | Self::Twineedle => todo!(),
+            Self::AttackTwice | Self::Haze | Self::Metronome | Self::MirrorMove | Self::SpeedUp | Self::Twineedle => todo!(),
             Self::AttackUp1
             | Self::AttackUp2
             | Self::Bide
@@ -594,6 +532,7 @@ impl Effect {
             | Self::FocusEnergy
             | Self::Heal
             | Self::LightScreen
+            | Self::Mist
             | Self::Reflect
             | Self::SpecialUp1
             | Self::SpecialUp2
@@ -673,6 +612,7 @@ impl Effect {
             | Self::Metronome
             | Self::Mimic
             | Self::MirrorMove
+            | Self::Mist
             | Self::NoEffect
             | Self::Ohko
             | Self::Paralyze
@@ -719,6 +659,71 @@ impl Effect {
             103.0f64 / 256.0f64
         } else {
             0.0f64
+        }
+    }
+
+    fn apply_status(&self, stages: &mut StatStages) {
+        match *self {
+            Self::AccuracyDown => stages.acc = (stages.acc - 1).max(-6),
+            Self::AttackDown | Self::AttackDownSide => stages.atk = (stages.atk - 1).max(-6),
+            Self::AttackUp1 => stages.atk = (stages.atk + 1).min(6),
+            Self::AttackUp2 => stages.atk = (stages.atk + 2).min(6),
+            Self::DefenseDown1 | Self::DefenseDownSide => stages.def = (stages.def - 1).max(-6),
+            Self::DefenseDown2 => stages.def = (stages.def - 2).max(-6),
+            Self::DefenseUp1 => stages.def = (stages.def + 1).min(6),
+            Self::DefenseUp2 => stages.def = (stages.def + 2).min(6),
+            Self::EvasionUp => stages.eva = (stages.eva + 1).min(6),
+            Self::SpecialDownSide => stages.spc = (stages.spc - 1).max(-6),
+            Self::SpecialUp1 => stages.spc = (stages.spc + 1).min(6),
+            Self::SpecialUp2 => stages.spc = (stages.spc + 2).min(6),
+            Self::SpeedDown | Self::SpeedDownSide => stages.spd = (stages.spd - 1).max(-6),
+            Self::SpeedUp => stages.spd = (stages.spd + 1).min(6),
+            Self::AttackTwice
+            | Self::Bide
+            | Self::BurnSide1
+            | Self::BurnSide2
+            | Self::Charge
+            | Self::Confusion
+            | Self::ConfusionSide
+            | Self::Disable
+            | Self::DrainHp
+            | Self::DreamEater
+            | Self::Explode
+            | Self::Flinch1
+            | Self::Flinch2
+            | Self::FocusEnergy
+            | Self::FreezeSide
+            | Self::Haze
+            | Self::Heal
+            | Self::HyperBeam
+            | Self::LeechSeed
+            | Self::LightScreen
+            | Self::Metronome
+            | Self::Mimic
+            | Self::MirrorMove
+            | Self::Mist
+            | Self::NoEffect
+            | Self::Ohko
+            | Self::Paralyze
+            | Self::ParalyzeSide1
+            | Self::ParalyzeSide2
+            | Self::PayDay
+            | Self::Poison
+            | Self::PoisonSide1
+            | Self::PoisonSide2
+            | Self::Rage
+            | Self::Recoil
+            | Self::Reflect
+            | Self::Sleep
+            | Self::SpecialDamage
+            | Self::Substitute
+            | Self::SuperFang
+            | Self::Swift
+            | Self::SwitchAndTeleport
+            | Self::ThrashPetalDance
+            | Self::Trapping
+            | Self::Twineedle
+            | Self::TwoToFiveAttacks => unreachable!(),
         }
     }
 }

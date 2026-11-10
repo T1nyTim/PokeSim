@@ -28,11 +28,11 @@ impl<'battle> Combatant<'battle> {
                 .all(|target_type| mv.mv_type.effectiveness(target_type) != 0)
     }
 
-    pub(super) fn confusion_damage(&self, state: &CombatantState) -> u16 {
+    pub(super) fn confusion_damage(&self, state: &CombatantState, opponent_reflect: bool) -> u16 {
         self.pokemon.base_damage(
             40,
             state.physical_attack(self.stats.atk),
-            StatStages::apply(self.stats.def, state.stages.def),
+            self.physical_defense(state, opponent_reflect),
             false,
             &Effect::NoEffect,
         ) as u16
@@ -175,7 +175,7 @@ impl<'battle> Combatant<'battle> {
         } else {
             (
                 state.physical_attack(self.stats.atk),
-                StatStages::apply(target.stats.def, target_state.stages.def) * if target_state.reflect { 2 } else { 1 },
+                target.physical_defense(target_state, target_state.reflect),
             )
         };
         let mut damage = self.pokemon.base_damage(mv.power, attack, defense, crit, &mv.effect);
@@ -213,6 +213,10 @@ impl<'battle> Combatant<'battle> {
             &cache.staged(state, target_state, mv).normal[attack][defense]
         };
         rolls.get_or_init(|| self.calculate_damage_rolls(target, state, target_state, mv, crit))
+    }
+
+    fn physical_defense(&self, state: &CombatantState, reflect: bool) -> u32 {
+        StatStages::apply(self.stats.def, state.stages.def) * if reflect { 2 } else { 1 }
     }
 }
 

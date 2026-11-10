@@ -44,9 +44,12 @@ pub struct CombatantState {
     disabled: Option<DisableState>,
     pub focus_energy: bool,
     pub frozen: bool,
+    pub mist: bool,
     paralyzed: bool,
     poisoned: bool,
     pub rage_accuracy: Option<u8>,
+    pub rampage: Option<RampageState>,
+    pub recharge_slot: Option<u8>,
     pub reflect: bool,
     seeded: bool,
     sleep_elapsed: Option<u8>,
@@ -108,7 +111,7 @@ impl CombatantState {
     }
 
     pub(super) const fn can_be_put_to_sleep(&self) -> bool {
-        self.hp > 0 && !self.has_status_condition()
+        self.hp > 0 && (self.recharge_slot.is_some() || !self.has_status_condition())
     }
 
     pub(super) const fn disable(&mut self, disabled: DisableState) {
@@ -128,12 +131,23 @@ impl CombatantState {
     }
 
     pub(super) const fn fall_asleep(&mut self) {
+        if self.recharge_slot.take().is_some() {
+            self.burned = false;
+            self.frozen = false;
+            self.paralyzed = false;
+            self.poisoned = false;
+        }
         self.sleep_elapsed = Some(0);
     }
 
     pub(super) const fn finish_charging(&mut self) {
         self.charging_slot = None;
         self.underground = false;
+    }
+
+    pub(super) const fn finish_rampage(&mut self) {
+        self.rampage = None;
+        self.confusion_elapsed = Some(0);
     }
 
     pub(super) const fn full_paralysis_probability(&self) -> f64 {
@@ -143,11 +157,16 @@ impl CombatantState {
     pub(super) const fn interrupt_move(&mut self) {
         self.bide = None;
         self.charging_slot = None;
+        self.rampage = None;
         self.trapping = None;
     }
 
     pub(super) const fn is_asleep(&self) -> bool {
         self.sleep_elapsed.is_some()
+    }
+
+    pub(super) const fn start_rampage(&mut self, slot: usize, accuracy: u8) {
+        self.rampage = Some(RampageState::new(slot as u8, 1, accuracy));
     }
 
     pub(super) const fn wake_up(&mut self) {
@@ -164,6 +183,18 @@ impl CombatantState {
 
     pub(super) fn advance_disable(&mut self) -> Option<f64> {
         self.disabled.as_mut().map(DisableState::advance)
+    }
+
+    pub(super) fn advance_rampage(&mut self) -> Option<f64> {
+        self.rampage.as_mut().map(|rampage| {
+            rampage.turns_elapsed += 1;
+            match rampage.turns_elapsed {
+                2 => 0.0f64,
+                3 => 0.5f64,
+                4 => 1.0f64,
+                _ => unreachable!("A rampage lasts three or four attacks"),
+            }
+        })
     }
 
     pub(super) fn advance_sleep(&mut self) -> Option<f64> {
@@ -204,6 +235,12 @@ impl CombatantState {
         f64::from(threshold) / 256.0
     }
 
+    pub(super) fn rampage_hit_probability(&mut self, target_eva: i8) -> f64 {
+        let rampage = self.rampage.as_mut().expect("A rampage move must have started");
+        rampage.accuracy = self.stages.hit_threshold(rampage.accuracy, target_eva);
+        f64::from(rampage.accuracy) / 256.0
+    }
+
     pub(super) fn speed(&self, base_spd: u16) -> u32 {
         let speed = StatStages::apply(base_spd, self.stages.spd);
         if self.paralyzed { (speed / 4).max(1) } else { speed }
@@ -236,9 +273,12 @@ impl CombatantState {
         disabled: Option<DisableState>,
         focus_energy: bool,
         frozen: bool,
+        mist: bool,
         paralyzed: bool,
         poisoned: bool,
         rage_accuracy: Option<u8>,
+        rampage: Option<RampageState>,
+        recharge_slot: Option<u8>,
         reflect: bool,
         seeded: bool,
         sleep_elapsed: Option<u8>,
@@ -255,9 +295,12 @@ impl CombatantState {
             disabled,
             focus_energy,
             frozen,
+            mist,
             paralyzed,
             poisoned,
             rage_accuracy,
+            rampage,
+            recharge_slot,
             reflect,
             seeded,
             sleep_elapsed,
@@ -319,9 +362,12 @@ impl CombatantState {
             disabled: None,
             focus_energy: false,
             frozen: false,
+            mist: false,
             paralyzed: false,
             poisoned: false,
             rage_accuracy: None,
+            rampage: None,
+            recharge_slot: None,
             reflect: false,
             seeded: false,
             sleep_elapsed: None,
@@ -353,6 +399,36 @@ impl DisableState {
 
     const fn from_key(slot: u8, turns_elapsed: u8) -> Self {
         Self { slot, turns_elapsed }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct RampageState {
+    pub slot: u8,
+    turns_elapsed: u8,
+    accuracy: u8,
+}
+
+impl RampageState {
+    const fn key(&self) -> u16 {
+        u16::from_le_bytes([(self.turns_elapsed << 2) | self.slot, self.accuracy])
+    }
+
+    const fn from_key(data: u16) -> Self {
+        let [turns_and_slot, accuracy] = data.to_le_bytes();
+        Self {
+            slot: turns_and_slot & 3,
+            turns_elapsed: turns_and_slot >> 2,
+            accuracy,
+        }
+    }
+
+    const fn new(slot: u8, turns_elapsed: u8, accuracy: u8) -> Self {
+        Self {
+            slot,
+            turns_elapsed,
+            accuracy,
+        }
     }
 }
 

@@ -128,6 +128,8 @@ impl TurnContext {
         }
         let probability = if matches!(mv.effect, Effect::Rage) {
             attacker.rage_hit_probability(target.stages.eva)
+        } else if matches!(mv.effect, Effect::ThrashPetalDance) {
+            attacker.rampage_hit_probability(target.stages.eva)
         } else {
             attacker.stages.hit_probability(mv, target.stages.eva)
         };
