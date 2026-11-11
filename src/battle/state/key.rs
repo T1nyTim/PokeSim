@@ -2,7 +2,10 @@ use core::hash::{BuildHasherDefault, Hash, Hasher};
 use std::collections::HashMap;
 
 use crate::{
-    battle::state::{BideState, CombatantState, DisableState, RampageState, Sleep, StatStages, TrappingState, battle::BattleState},
+    battle::{
+        Side,
+        state::{BideState, CombatantState, DisableState, RampageState, Sleep, StatStages, TrappingState, battle::BattleState},
+    },
     data::move_data::Move,
 };
 
@@ -45,6 +48,16 @@ impl BattleKey {
             u16::from_le_bytes([dmg_low, dmg_high]),
             ai_items_left,
         )
+    }
+
+    #[inline]
+    pub(crate) fn with_hp_loss(mut self, side: Side, damage: u16) -> Self {
+        let combatant = match side {
+            Side::Player => &mut self.player,
+            Side::Ai => &mut self.ai,
+        };
+        combatant.flags -= u64::from(damage);
+        self
     }
 
     pub(super) const fn batch_order_with_hp_offset(order: u64, block_idx: usize, cell_idx: usize) -> u64 {

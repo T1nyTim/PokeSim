@@ -33,6 +33,10 @@ impl Hash for BattleState {
 }
 
 impl BattleState {
+    pub(crate) const fn can_share_damage_rolls(&self, side: Side) -> bool {
+        self.player.bide.is_none() && self.ai.bide.is_none() && !self.combatant(side).seeded
+    }
+
     pub(crate) const fn clear_unused_damage(&mut self) {
         if self.player.bide.is_none() && self.ai.bide.is_none() {
             self.last_damage = 0;

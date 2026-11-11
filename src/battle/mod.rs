@@ -3,7 +3,7 @@ pub mod state;
 mod turn;
 
 use core::{
-    array,
+    array, iter,
     mem::{self},
 };
 
@@ -44,6 +44,7 @@ pub struct Battle<'battle> {
     ai_choices: [AiChoices; 20],
     ai_item: Option<&'battle TrainerItem>,
     is_trainer: bool,
+    batch_turns: bool,
     remaining_turns: usize,
     outcome: BattleOutcome,
 }
@@ -70,6 +71,7 @@ impl<'battle> Battle<'battle> {
             }),
             ai_item: matchup.ai.item(),
             is_trainer: !matches!(matchup.kind, MatchupKind::Wild),
+            batch_turns: false,
             remaining_turns: 0,
             outcome: BattleOutcome::default(),
         }
@@ -78,6 +80,7 @@ impl<'battle> Battle<'battle> {
     pub(super) fn run(&mut self, max_depth: usize) -> BattleOutcome {
         self.states.clear();
         self.next_actions.clear();
+        self.batch_turns = false;
         self.remaining_turns = max_depth;
         self.outcome = BattleOutcome::default();
         self.outcome.unresolved = 0.0f64;
@@ -85,7 +88,6 @@ impl<'battle> Battle<'battle> {
         init_state.cap_surplus_pp(self.remaining_turns);
         self.states.frontier.entries.insert(init_state.key(), 1.0f64);
         let mut current_states = StateFrontier::default();
-        let mut batch_turns = false;
         for idx in 0..max_depth {
             if self.states.frontier.is_empty() {
                 break;
@@ -97,8 +99,8 @@ impl<'battle> Battle<'battle> {
             }
             self.player_choices.clear();
             let second_turn = idx % 256 == 1;
-            batch_turns |= current_states.len() >= 4_096;
-            if !batch_turns {
+            self.batch_turns |= current_states.len() >= 4_096;
+            if !self.batch_turns {
                 #[expect(clippy::iter_over_hash_type, reason = "Order is not important here")]
                 for (state_key, probability) in current_states.entries.drain() {
                     self.start_state_turn(&state_key, state_key.hp_pair(), probability, second_turn);
@@ -330,37 +332,55 @@ impl<'battle> Battle<'battle> {
         }
     }
 
-    fn finish_action(&mut self, mut branch: Branch, probability: f64) {
-        if probability == 0.0f64 {
-            return;
+    fn finish_action(&mut self, branch: Branch, probability: f64) {
+        if probability != 0.0f64 {
+            self.finish_action_rolls(branch, iter::once((0, probability)));
         }
+    }
+
+    fn finish_action_rolls(&mut self, mut branch: Branch, outcomes: impl Iterator<Item = (u16, f64)>) {
+        let rolls = outcomes.filter(|&(_, probability)| probability != 0.0f64);
         branch.state.clear_unused_damage();
         if let Some(winner) = branch.state.winner() {
-            self.outcome.record(winner, probability);
+            for (_, probability) in rolls {
+                self.outcome.record(winner, probability);
+            }
             return;
         }
         let side = branch.turn.side.expect("Finishing an action requires an acting side");
-        let (max_hp, opponent_max_hp) = match side {
-            Side::Player => (self.player.stats.hp, self.ai.stats.hp),
-            Side::Ai => (self.ai.stats.hp, self.player.stats.hp),
+        let (max_hp, opponent_max_hp, target_side) = match side {
+            Side::Player => (self.player.stats.hp, self.ai.stats.hp, Side::Ai),
+            Side::Ai => (self.ai.stats.hp, self.player.stats.hp, Side::Player),
         };
         branch.state.apply_residual_damage(side, max_hp, opponent_max_hp);
         if let Some(winner) = branch.state.winner() {
-            self.outcome.record(winner, probability);
+            for (_, probability) in rolls {
+                self.outcome.record(winner, probability);
+            }
             return;
         }
         if let Some((next_side, action)) = branch.turn.next_action() {
-            let pending = PendingAction::new(&branch.state, next_side, action);
-            *self.next_actions.entry(pending).or_insert(0.0f64) += probability;
+            let state_key = branch.state.key();
+            for (extra_dmg, probability) in rolls {
+                let pending_key = state_key.clone().with_hp_loss(target_side, extra_dmg);
+                let pending = PendingAction::new(pending_key, next_side, action.clone());
+                *self.next_actions.entry(pending).or_insert(0.0f64) += probability;
+            }
             return;
         }
         branch.state.finish_turn();
         if self.remaining_turns == 0 {
-            self.outcome.unresolved += probability;
+            for (_, probability) in rolls {
+                self.outcome.unresolved += probability;
+            }
             return;
         }
         branch.state.cap_surplus_pp(self.remaining_turns);
-        self.states.accumulate(branch.state.key(), probability);
+        let state_key = branch.state.key();
+        for (extra_dmg, probability) in rolls {
+            self.states
+                .accumulate(state_key.clone().with_hp_loss(target_side, extra_dmg), probability);
+        }
     }
 
     fn resolve_action(&mut self, mut branch: Branch, mut probability: f64) {
@@ -440,10 +460,13 @@ impl<'battle> Battle<'battle> {
         self.begin_action(branch, probability);
     }
 
-    fn resolve_damage(&mut self, mut branch: Branch, mut probability: f64, dmg: u16, hits: u16) {
-        if probability == 0.0f64 {
-            return;
+    fn resolve_damage(&mut self, branch: Branch, probability: f64, dmg: u16, hits: u16) {
+        if probability != 0.0f64 {
+            self.resolve_damage_outcomes(branch, iter::once((0, probability)), dmg, hits);
         }
+    }
+
+    fn resolve_damage_outcomes(&mut self, mut branch: Branch, rolls: impl Iterator<Item = (u16, f64)> + Clone, dmg: u16, hits: u16) {
         let side = branch.turn.side.expect("Applying damage requires an acting side");
         let (slot, mv) = branch.turn.selected_move();
         let dmg_dealt = branch.state.apply_damage(dmg, mv, side, hits);
@@ -460,7 +483,7 @@ impl<'battle> Battle<'battle> {
         branch.state.combatant_mut(side).heal(mv.effect.drained_hp(dmg_dealt), max_hp);
         if matches!(mv.effect, Effect::Trapping) && branch.state.winner().is_none() {
             branch.state.start_trapping(side, mv, dmg);
-            self.finish_action(branch, probability);
+            self.finish_action_rolls(branch, rolls);
             return;
         }
         let (target_side, target_types) = match side {
@@ -482,10 +505,17 @@ impl<'battle> Battle<'battle> {
             } else {
                 affected.state.apply_secondary(&mv.effect, side);
             }
-            self.finish_action(affected, probability * secondary_prob);
-            probability *= 1.0f64 - secondary_prob;
+            self.finish_action_rolls(
+                affected,
+                rolls.clone().map(|(extra_dmg, probability)| (extra_dmg, probability * secondary_prob)),
+            );
+            let unaffected_prob = 1.0f64 - secondary_prob;
+            if unaffected_prob > 0.0f64 {
+                self.finish_action_rolls(branch, rolls.map(|(extra_dmg, probability)| (extra_dmg, probability * unaffected_prob)));
+            }
+            return;
         }
-        self.finish_action(branch, probability);
+        self.finish_action_rolls(branch, rolls);
     }
 
     fn resolve_damage_rolls(&mut self, branch: Branch, probability: f64) {
@@ -493,7 +523,8 @@ impl<'battle> Battle<'battle> {
             return;
         }
         let (_, mv) = branch.turn.selected_move();
-        let (attacker, target, attacker_state, target_state) = match branch.turn.side.expect("Damage resolution requires an acting side") {
+        let side = branch.turn.side.expect("Damage resolution requires an acting side");
+        let (attacker, target, attacker_state, target_state) = match side {
             Side::Player => (&self.player, &self.ai, &branch.state.player, &branch.state.ai),
             Side::Ai => (&self.ai, &self.player, &branch.state.ai, &branch.state.player),
         };
@@ -508,10 +539,7 @@ impl<'battle> Battle<'battle> {
             return;
         }
         let rolls = branch.turn.damage_outcomes(&branch.state, &self.player, &self.ai);
-        let target_hp = match branch.turn.side.expect("Damage resolution requires an acting side") {
-            Side::Player => branch.state.ai.hp,
-            Side::Ai => branch.state.player.hp,
-        };
+        let target_hp = target_state.hp;
         let (&(max_dmg, max_prob), lower_rolls) = rolls.split_last().expect("A damaging move must produce at least one damage outcome");
         let (alternatives, last_dmg, last_prob) = if max_dmg <= target_hp {
             (lower_rolls, max_dmg, max_prob)
@@ -519,9 +547,23 @@ impl<'battle> Battle<'battle> {
             let (nonlethal, lethal) = rolls.split_at(rolls.partition_point(|&(damage, _)| damage < target_hp));
             (nonlethal, target_hp, lethal.iter().map(|&(_, roll_prob)| roll_prob).sum::<f64>())
         };
-        for &(dmg, roll_prob) in alternatives {
-            let alternative = branch.clone();
-            self.resolve_damage(alternative, probability * roll_prob, dmg, 1);
+        let nonlethal = if max_dmg < target_hp { rolls.as_ref() } else { alternatives };
+        if self.batch_turns
+            && matches!(mv.effect, Effect::NoEffect | Effect::ConfusionSide)
+            && let [(min_dmg, _), _, ..] = nonlethal
+            && *min_dmg > 0
+            && branch.state.can_share_damage_rolls(side)
+        {
+            let outcomes = nonlethal.iter().map(|&(dmg, roll_prob)| (dmg - *min_dmg, probability * roll_prob));
+            if max_dmg < target_hp {
+                self.resolve_damage_outcomes(branch, outcomes, *min_dmg, 1);
+                return;
+            }
+            self.resolve_damage_outcomes(branch.clone(), outcomes, *min_dmg, 1);
+        } else {
+            for &(dmg, roll_prob) in alternatives {
+                self.resolve_damage(branch.clone(), probability * roll_prob, dmg, 1);
+            }
         }
         self.resolve_damage(branch, probability * last_prob, last_dmg, 1);
     }

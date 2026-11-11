@@ -61,12 +61,8 @@ impl PendingAction {
         Branch::new(self.state.to_state(), TurnContext::new(actions, Some(self.side)))
     }
 
-    pub(super) fn new(state: &BattleState, side: Side, action: TurnAction) -> Self {
-        Self {
-            state: state.key(),
-            action,
-            side,
-        }
+    pub(super) const fn new(state: BattleKey, side: Side, action: TurnAction) -> Self {
+        Self { state, action, side }
     }
 }
 
