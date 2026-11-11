@@ -243,13 +243,16 @@ impl BattleState {
             }
         }
         let flags = available_moves
-            | (u8::from(self.player.burned) << 4u8)
+            | (u8::from(self.player.attack_halved()) << 4u8)
             | (u8::from(self.player.focus_energy) << 5u8)
             | (u8::from(self.ai.seeded) << 6u8)
             | (u8::from(self.ai.has_status_condition()) << 7u8);
         let [hp_low, hp_high] = self.ai.hp.to_le_bytes();
         let acc_and_eva = (self.player.stages.acc as u8 & 15) | ((self.ai.stages.eva as u8) << 4u8);
-        let def_and_flags = (self.ai.stages.def as u8 & 15) | (u8::from(self.ai.reflect) << 4u8) | (u8::from(has_ohko_speed) << 5u8);
+        let def_and_flags = (self.ai.stages.def as u8 & 15)
+            | (u8::from(self.ai.reflect) << 4u8)
+            | (u8::from(has_ohko_speed) << 5u8)
+            | (u8::from(self.ai.light_screen) << 6u8);
         u64::from_le_bytes([
             hp_low,
             hp_high,

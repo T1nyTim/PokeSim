@@ -255,6 +255,8 @@ impl<'battle> Battle<'battle> {
             return;
         }
         let target_hp = target.hp;
+        let attacker_lv = attacker_combatant.pokemon.level;
+        let attacker_max_hp = attacker_combatant.stats.hp;
         let hit_prob = if matches!(resolution, EffectResolution::Sleep) && target.recharge_slot.is_some() {
             1.0f64
         } else if matches!(resolution, EffectResolution::Ohko)
@@ -308,8 +310,12 @@ impl<'battle> Battle<'battle> {
                 self.finish_action(branch, probability * slot_prob);
             }
             EffectResolution::FixedDamage => {
-                let damage = mv.fixed_damage().unwrap_or_else(|| todo!("Fixed damage for {}", mv.name()));
+                let damage = mv.fixed_damage(attacker_lv).unwrap_or_else(|| todo!("Fixed damage for {}", mv.name()));
                 self.resolve_damage(branch, probability, damage, 1);
+            }
+            EffectResolution::Heal => {
+                branch.state.combatant_mut(side).heal_with_move(attacker_max_hp, mv);
+                self.finish_action(branch, probability);
             }
             EffectResolution::Ohko => self.resolve_damage(branch, probability, target_hp, 1),
             EffectResolution::Sleep => {

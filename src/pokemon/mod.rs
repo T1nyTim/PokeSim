@@ -157,7 +157,7 @@ impl Pokemon {
         if matches!(mv.effect, Effect::Ohko) {
             return f64::from(Self::AVG_HP) * hit_prob;
         }
-        if let Some(damage) = mv.fixed_damage() {
+        if let Some(damage) = mv.fixed_damage(self.level) {
             return f64::from(damage) * hit_prob;
         }
         if matches!(mv.effect, Effect::LeechSeed | Effect::Poison) {

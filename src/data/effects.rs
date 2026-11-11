@@ -1,7 +1,7 @@
 use core::array;
 
 use crate::{
-    battle::state::{BideState, CombatantState, DisableState, StatStages},
+    battle::state::{BideState, CombatantState, DisableState},
     data::Type,
 };
 
@@ -63,6 +63,7 @@ pub enum Effect {
     SpeedDown,
     SpeedDownSide,
     SpeedUp,
+    Splash,
     Substitute,
     SuperFang,
     Swift,
@@ -131,7 +132,15 @@ impl Effect {
     pub(crate) const fn preserves_last_damage(&self) -> bool {
         matches!(
             self,
-            Self::Confusion | Self::FocusEnergy | Self::LeechSeed | Self::Paralyze | Self::Poison | Self::Reflect
+            Self::Confusion
+                | Self::FocusEnergy
+                | Self::Heal
+                | Self::LeechSeed
+                | Self::LightScreen
+                | Self::Paralyze
+                | Self::Poison
+                | Self::Reflect
+                | Self::Splash
         )
     }
 
@@ -168,6 +177,7 @@ impl Effect {
             | Self::TwoToFiveAttacks => EffectResolution::Damage,
             Self::Disable => EffectResolution::Disable,
             Self::SpecialDamage | Self::SuperFang => EffectResolution::FixedDamage,
+            Self::Heal => EffectResolution::Heal,
             Self::Ohko => EffectResolution::Ohko,
             Self::Sleep => EffectResolution::Sleep,
             Self::AccuracyDown
@@ -182,6 +192,7 @@ impl Effect {
             | Self::EvasionUp
             | Self::FocusEnergy
             | Self::LeechSeed
+            | Self::LightScreen
             | Self::Mist
             | Self::Paralyze
             | Self::Poison
@@ -189,9 +200,10 @@ impl Effect {
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
-            | Self::SpeedUp => EffectResolution::Status,
+            | Self::SpeedUp
+            | Self::Splash => EffectResolution::Status,
             Self::SwitchAndTeleport => EffectResolution::SwitchOrEscape,
-            Self::AttackTwice | Self::DreamEater | Self::Haze | Self::Heal | Self::LightScreen | Self::Metronome | Self::Substitute => todo!(),
+            Self::AttackTwice | Self::DreamEater | Self::Haze | Self::Metronome | Self::Substitute => todo!(),
         }
     }
 
@@ -212,15 +224,18 @@ impl Effect {
                 | Self::SpecialUp1
                 | Self::SpecialUp2
                 | Self::SpeedUp
+                | Self::Splash
                 | Self::Substitute
         )
     }
 
     pub(crate) fn apply_primary(&self, target: &mut CombatantState, target_types: &[Type; 2]) {
         match self {
+            Self::AccuracyDown | Self::AttackDown | Self::DefenseDown1 | Self::DefenseDown2 | Self::SpeedDown if target.mist => {}
             Self::Confusion => target.confuse(),
             Self::FocusEnergy => target.focus_energy = true,
             Self::LeechSeed => target.seed(target_types),
+            Self::LightScreen => target.light_screen = true,
             Self::Mist => target.mist = true,
             Self::Paralyze => {
                 if target.can_be_paralyzed() {
@@ -233,7 +248,7 @@ impl Effect {
                 }
             }
             Self::Reflect => target.reflect = true,
-            Self::AccuracyDown | Self::AttackDown | Self::DefenseDown1 | Self::DefenseDown2 | Self::SpeedDown if target.mist => {}
+            Self::Splash => {}
             Self::AttackDownSide
             | Self::AccuracyDown
             | Self::AttackDown
@@ -261,7 +276,6 @@ impl Effect {
             | Self::Haze
             | Self::Heal
             | Self::HyperBeam
-            | Self::LightScreen
             | Self::Metronome
             | Self::MirrorMove
             | Self::Mimic
@@ -289,13 +303,13 @@ impl Effect {
             | Self::ThrashPetalDance
             | Self::Trapping
             | Self::Twineedle
-            | Self::TwoToFiveAttacks => self.apply_status(&mut target.stages),
+            | Self::TwoToFiveAttacks => self.apply_status(target),
         }
     }
 
     pub(crate) fn apply_secondary(&self, target: &mut CombatantState) {
         match *self {
-            Self::AttackDownSide | Self::DefenseDownSide | Self::SpecialDownSide | Self::SpeedDownSide => self.apply_status(&mut target.stages),
+            Self::AttackDownSide | Self::DefenseDownSide | Self::SpecialDownSide | Self::SpeedDownSide => self.apply_status(target),
             Self::BurnSide1 | Self::BurnSide2 => {
                 if target.frozen {
                     target.frozen = false;
@@ -350,6 +364,7 @@ impl Effect {
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedUp
+            | Self::Splash
             | Self::Substitute
             | Self::SuperFang
             | Self::Swift
@@ -466,6 +481,7 @@ impl Effect {
             | Self::SpeedDown
             | Self::SpeedDownSide
             | Self::SpeedUp
+            | Self::Splash
             | Self::Substitute
             | Self::SuperFang
             | Self::Swift
@@ -536,6 +552,7 @@ impl Effect {
             | Self::Reflect
             | Self::SpecialUp1
             | Self::SpecialUp2
+            | Self::Splash
             | Self::Substitute
             | Self::Swift
             | Self::SwitchAndTeleport => 1.0,
@@ -633,6 +650,7 @@ impl Effect {
             | Self::SpeedDown
             | Self::SpeedDownSide
             | Self::SpeedUp
+            | Self::Splash
             | Self::Substitute
             | Self::SuperFang
             | Self::Swift
@@ -662,22 +680,22 @@ impl Effect {
         }
     }
 
-    fn apply_status(&self, stages: &mut StatStages) {
+    fn apply_status(&self, target: &mut CombatantState) {
         match *self {
-            Self::AccuracyDown => stages.acc = (stages.acc - 1).max(-6),
-            Self::AttackDown | Self::AttackDownSide => stages.atk = (stages.atk - 1).max(-6),
-            Self::AttackUp1 => stages.atk = (stages.atk + 1).min(6),
-            Self::AttackUp2 => stages.atk = (stages.atk + 2).min(6),
-            Self::DefenseDown1 | Self::DefenseDownSide => stages.def = (stages.def - 1).max(-6),
-            Self::DefenseDown2 => stages.def = (stages.def - 2).max(-6),
-            Self::DefenseUp1 => stages.def = (stages.def + 1).min(6),
-            Self::DefenseUp2 => stages.def = (stages.def + 2).min(6),
-            Self::EvasionUp => stages.eva = (stages.eva + 1).min(6),
-            Self::SpecialDownSide => stages.spc = (stages.spc - 1).max(-6),
-            Self::SpecialUp1 => stages.spc = (stages.spc + 1).min(6),
-            Self::SpecialUp2 => stages.spc = (stages.spc + 2).min(6),
-            Self::SpeedDown | Self::SpeedDownSide => stages.spd = (stages.spd - 1).max(-6),
-            Self::SpeedUp => stages.spd = (stages.spd + 1).min(6),
+            Self::AccuracyDown => target.stages.acc = (target.stages.acc - 1).max(-6),
+            Self::AttackDown | Self::AttackDownSide => target.change_atk_stage(-1),
+            Self::AttackUp1 => target.change_atk_stage(1),
+            Self::AttackUp2 => target.change_atk_stage(2),
+            Self::DefenseDown1 | Self::DefenseDownSide => target.stages.def = (target.stages.def - 1).max(-6),
+            Self::DefenseDown2 => target.stages.def = (target.stages.def - 2).max(-6),
+            Self::DefenseUp1 => target.stages.def = (target.stages.def + 1).min(6),
+            Self::DefenseUp2 => target.stages.def = (target.stages.def + 2).min(6),
+            Self::EvasionUp => target.stages.eva = (target.stages.eva + 1).min(6),
+            Self::SpecialDownSide => target.stages.spc = (target.stages.spc - 1).max(-6),
+            Self::SpecialUp1 => target.stages.spc = (target.stages.spc + 1).min(6),
+            Self::SpecialUp2 => target.stages.spc = (target.stages.spc + 2).min(6),
+            Self::SpeedDown | Self::SpeedDownSide => target.change_spd_stage(-1),
+            Self::SpeedUp => target.change_spd_stage(1),
             Self::AttackTwice
             | Self::Bide
             | Self::BurnSide1
@@ -716,6 +734,7 @@ impl Effect {
             | Self::Reflect
             | Self::Sleep
             | Self::SpecialDamage
+            | Self::Splash
             | Self::Substitute
             | Self::SuperFang
             | Self::Swift
@@ -735,6 +754,7 @@ pub enum EffectResolution {
     Damage,
     Disable,
     FixedDamage,
+    Heal,
     Ohko,
     Sleep,
     Status,

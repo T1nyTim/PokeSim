@@ -2,7 +2,7 @@ use core::hash::{BuildHasherDefault, Hash, Hasher};
 use std::collections::HashMap;
 
 use crate::{
-    battle::state::{BideState, CombatantState, DisableState, RampageState, StatStages, TrappingState, battle::BattleState},
+    battle::state::{BideState, CombatantState, DisableState, RampageState, Sleep, StatStages, TrappingState, battle::BattleState},
     data::move_data::Move,
 };
 
@@ -140,6 +140,8 @@ impl Hash for CombatantKey {
 }
 
 impl CombatantKey {
+    const RESTING: u8 = 7;
+    const WAKING_FROM_REST: u8 = 8;
     const FROZEN: u8 = 14;
 
     pub(super) fn new(combatant: &CombatantState) -> Self {
@@ -157,10 +159,19 @@ impl CombatantKey {
         let locked_move_data = bide.map_or_else(|| combatant.rampage.as_ref().map_or(0, RampageState::key), |active| active.damage);
         let trapping = combatant.trapping.as_ref();
         let acc_and_eva = (combatant.stages.acc as u8 & 15) | ((combatant.stages.eva as u8) << 4u8);
+        let spd_and_flags = (combatant.stages.spd as u8 & 15)
+            | (u8::from(combatant.rest_atk_penalty) << 4u8)
+            | (u8::from(combatant.rest_spd_penalty) << 5u8)
+            | (u8::from(combatant.light_screen) << 6u8);
         let sleep = if combatant.frozen {
             Self::FROZEN
         } else {
-            combatant.sleep_elapsed.unwrap_or(15)
+            match combatant.sleep {
+                Some(Sleep::Inflicted(turns_elapsed)) => turns_elapsed,
+                Some(Sleep::Resting) => Self::RESTING,
+                Some(Sleep::WakingFromRest) => Self::WAKING_FROM_REST,
+                None => 15,
+            }
         };
         let status = u64::from(sleep)
             | (u64::from(combatant.confusion_elapsed.unwrap_or(7)) << 4u64)
@@ -180,7 +191,7 @@ impl CombatantKey {
                 hp_high,
                 combatant.stages.atk as u8,
                 combatant.stages.def as u8,
-                combatant.stages.spd as u8,
+                spd_and_flags,
                 combatant.stages.spc as u8,
                 acc_and_eva,
                 flags,
@@ -205,8 +216,14 @@ impl CombatantKey {
     }
 
     fn to_state(&self, hp: u16, recharge_slot: Option<u8>, mist: bool) -> CombatantState {
-        let [_, _, atk, def, spd, spc, acc_and_eva, flags] = self.flags.to_le_bytes();
-        let sleep = (self.status & 15) as u8;
+        let [_, _, atk, def, spd_and_flags, spc, acc_and_eva, flags] = self.flags.to_le_bytes();
+        let sleep_code = (self.status & 15) as u8;
+        let sleep = match sleep_code {
+            0..=6 => Some(Sleep::Inflicted(sleep_code)),
+            Self::RESTING => Some(Sleep::Resting),
+            Self::WAKING_FROM_REST => Some(Sleep::WakingFromRest),
+            _ => None,
+        };
         let confusion = ((self.status >> 4u64) & 7) as u8;
         let disabled_slot = ((self.status >> 7u64) & 7) as u8;
         let rage_acc = (self.status >> 55u64) as u8;
@@ -217,7 +234,7 @@ impl CombatantKey {
             StatStages::new(
                 atk.cast_signed(),
                 def.cast_signed(),
-                spd.cast_signed(),
+                (spd_and_flags << 4u8).cast_signed() >> 4u8,
                 spc.cast_signed(),
                 (acc_and_eva << 4u8).cast_signed() >> 4u8,
                 acc_and_eva.cast_signed() >> 4u8,
@@ -228,7 +245,8 @@ impl CombatantKey {
             (confusion != 7).then_some(confusion),
             (disabled_slot != 7).then_some(DisableState::from_key(disabled_slot, ((self.status >> 10) & 15) as u8)),
             flags & 64 != 0,
-            sleep == Self::FROZEN,
+            sleep_code == Self::FROZEN,
+            spd_and_flags & 0x40 != 0,
             mist,
             flags & 32 != 0,
             flags & 1 != 0,
@@ -236,8 +254,10 @@ impl CombatantKey {
             (!is_biding && locked_move_data != 0).then_some(RampageState::from_key(locked_move_data)),
             recharge_slot,
             self.status >> 63u64 != 0,
+            spd_and_flags & 0x10 != 0,
+            spd_and_flags & 0x20 != 0,
             flags & 2 != 0,
-            (sleep < Self::FROZEN).then_some(sleep),
+            sleep,
             self.trapping_mv.map(|mv| {
                 TrappingState::from_key(
                     mv,

@@ -72,7 +72,7 @@ impl<'battle> Combatant<'battle> {
                 0.0
             };
         }
-        if let Some(damage) = mv.fixed_damage() {
+        if let Some(damage) = mv.fixed_damage(self.pokemon.level) {
             return f64::from(damage.min(target_state.hp)) * hit_probability;
         }
         if matches!(mv.effect, Effect::LeechSeed | Effect::Poison) {
@@ -167,7 +167,7 @@ impl<'battle> Combatant<'battle> {
             } else {
                 (
                     StatStages::apply(self.stats.spc, state.stages.spc),
-                    StatStages::apply(target.stats.spc, target_state.stages.spc),
+                    StatStages::apply(target.stats.spc, target_state.stages.spc) * if target_state.light_screen { 2 } else { 1 },
                 )
             }
         } else if crit {
@@ -230,7 +230,7 @@ struct DamageRollCache {
     burned_focused: OnceCell<Box<StagedDamageCache>>,
     critical: OnceCell<Vec<(u16, f64)>>,
     focused: OnceCell<Box<StagedDamageCache>>,
-    reflected: OnceCell<Box<Self>>,
+    with_screen: OnceCell<Box<Self>>,
 }
 
 impl DamageRollCache {
@@ -241,18 +241,19 @@ impl DamageRollCache {
             burned_focused: OnceCell::new(),
             critical: OnceCell::new(),
             focused: OnceCell::new(),
-            reflected: OnceCell::new(),
+            with_screen: OnceCell::new(),
         }
     }
 
     fn staged(&self, state: &CombatantState, target: &CombatantState, mv: &Move) -> &StagedDamageCache {
         let physical = !mv.mv_type.is_special();
-        let cache = if target.reflect && physical {
-            self.reflected.get_or_init(|| Box::new(Self::new()))
+        let has_screen = if physical { target.reflect } else { target.light_screen };
+        let cache = if has_screen {
+            self.with_screen.get_or_init(|| Box::new(Self::new()))
         } else {
             self
         };
-        match (state.burned && physical, state.focus_energy) {
+        match (physical && state.attack_halved(), state.focus_energy) {
             (false, false) => &cache.normal,
             (true, false) => cache.burned.get_or_init(|| Box::new(StagedDamageCache::new())),
             (false, true) => cache.focused.get_or_init(|| Box::new(StagedDamageCache::new())),

@@ -8,7 +8,7 @@ use crate::data::{
     Type,
     effects::Effect,
     move_data::Move,
-    moves::{DIG, RAGE},
+    moves::{DIG, RAGE, REST},
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -44,6 +44,7 @@ pub struct CombatantState {
     disabled: Option<DisableState>,
     pub focus_energy: bool,
     pub frozen: bool,
+    pub light_screen: bool,
     pub mist: bool,
     paralyzed: bool,
     poisoned: bool,
@@ -51,8 +52,10 @@ pub struct CombatantState {
     pub rampage: Option<RampageState>,
     pub recharge_slot: Option<u8>,
     pub reflect: bool,
+    rest_atk_penalty: bool,
+    rest_spd_penalty: bool,
     seeded: bool,
-    sleep_elapsed: Option<u8>,
+    sleep: Option<Sleep>,
     trapping: Option<TrappingState>,
     pub underground: bool,
 }
@@ -81,7 +84,7 @@ impl CombatantState {
     }
 
     pub(crate) const fn has_status_condition(&self) -> bool {
-        self.burned || self.frozen || self.paralyzed || self.poisoned || self.sleep_elapsed.is_some()
+        self.burned || self.frozen || self.paralyzed || self.poisoned || self.is_asleep()
     }
 
     pub(crate) const fn paralyze(&mut self) {
@@ -96,6 +99,22 @@ impl CombatantState {
         self.hp > 0 && !self.has_status_condition() && !types.contains(&Type::Poison)
     }
 
+    pub(crate) fn change_atk_stage(&mut self, change: i16) {
+        let stage = (i16::from(self.stages.atk) + change).clamp(-6, 6) as i8;
+        if stage != self.stages.atk {
+            self.stages.atk = stage;
+            self.rest_atk_penalty = false;
+        }
+    }
+
+    pub(crate) fn change_spd_stage(&mut self, change: i8) {
+        let stage = (self.stages.spd + change).clamp(-6, 6);
+        if stage != self.stages.spd {
+            self.stages.spd = stage;
+            self.rest_spd_penalty = false;
+        }
+    }
+
     pub(crate) fn residual_damage(max_hp: u16) -> u16 {
         (max_hp / 16).max(1)
     }
@@ -104,6 +123,10 @@ impl CombatantState {
         if self.can_be_seeded(types) {
             self.seeded = true;
         }
+    }
+
+    pub(super) const fn attack_halved(&self) -> bool {
+        self.burned || self.rest_atk_penalty
     }
 
     pub(super) const fn can_be_disabled(&self) -> bool {
@@ -137,7 +160,7 @@ impl CombatantState {
             self.paralyzed = false;
             self.poisoned = false;
         }
-        self.sleep_elapsed = Some(0);
+        self.sleep = Some(Sleep::Inflicted(0));
     }
 
     pub(super) const fn finish_charging(&mut self) {
@@ -162,7 +185,7 @@ impl CombatantState {
     }
 
     pub(super) const fn is_asleep(&self) -> bool {
-        self.sleep_elapsed.is_some()
+        self.sleep.is_some()
     }
 
     pub(super) const fn start_rampage(&mut self, slot: usize, accuracy: u8) {
@@ -170,7 +193,7 @@ impl CombatantState {
     }
 
     pub(super) const fn wake_up(&mut self) {
-        self.sleep_elapsed = None;
+        self.sleep = None;
     }
 
     pub(super) fn advance_confusion(&mut self) -> Option<f64> {
@@ -199,10 +222,18 @@ impl CombatantState {
 
     pub(super) fn advance_sleep(&mut self) -> Option<f64> {
         #[expect(clippy::question_mark_used, reason = "handled before end of function")]
-        let turns_elapsed = self.sleep_elapsed.as_mut()?;
-        let probability = Effect::Sleep.duration_end_probability(*turns_elapsed);
-        *turns_elapsed += 1;
-        Some(probability)
+        let sleep = self.sleep.clone()?;
+        Some(match sleep {
+            Sleep::Inflicted(turns_elapsed) => {
+                self.sleep = Some(Sleep::Inflicted(turns_elapsed + 1));
+                Effect::Sleep.duration_end_probability(turns_elapsed)
+            }
+            Sleep::Resting => {
+                self.sleep = Some(Sleep::WakingFromRest);
+                0.0
+            }
+            Sleep::WakingFromRest => 1.0,
+        })
     }
 
     pub(super) fn can_be_seeded(&self, types: &[Type; 2]) -> bool {
@@ -217,13 +248,32 @@ impl CombatantState {
         self.hp = self.hp.saturating_add(amount).min(max_hp);
     }
 
+    pub(super) fn heal_with_move(&mut self, max_hp: u16, mv: &Move) {
+        let missing_hp = max_hp - self.hp;
+        if missing_hp == 0 || (missing_hp as u8 == u8::MAX && max_hp as u8 != u8::MAX) {
+            return;
+        }
+        if mv == &REST {
+            self.hp = max_hp;
+            self.rest_atk_penalty |= self.burned;
+            self.rest_spd_penalty |= self.paralyzed;
+            self.burned = false;
+            self.frozen = false;
+            self.paralyzed = false;
+            self.poisoned = false;
+            self.sleep = Some(Sleep::Resting);
+        } else {
+            self.heal(max_hp / 2, max_hp);
+        }
+    }
+
     pub(super) fn is_disabled(&self, slot: usize) -> bool {
         self.disabled.as_ref().is_some_and(|disabled| disabled.slot == slot as u8)
     }
 
     pub(super) fn physical_attack(&self, base_atk: u16) -> u32 {
         let attack = StatStages::apply(base_atk, self.stages.atk);
-        if self.burned { (attack / 2).max(1) } else { attack }
+        if self.attack_halved() { (attack / 2).max(1) } else { attack }
     }
 
     pub(super) fn rage_hit_probability(&mut self, target_eva: i8) -> f64 {
@@ -243,7 +293,11 @@ impl CombatantState {
 
     pub(super) fn speed(&self, base_spd: u16) -> u32 {
         let speed = StatStages::apply(base_spd, self.stages.spd);
-        if self.paralyzed { (speed / 4).max(1) } else { speed }
+        if self.paralyzed || self.rest_spd_penalty {
+            (speed / 4).max(1)
+        } else {
+            speed
+        }
     }
 
     pub(super) fn start_charging(&mut self, slot: usize, mv: &Move) {
@@ -273,6 +327,7 @@ impl CombatantState {
         disabled: Option<DisableState>,
         focus_energy: bool,
         frozen: bool,
+        light_screen: bool,
         mist: bool,
         paralyzed: bool,
         poisoned: bool,
@@ -280,8 +335,10 @@ impl CombatantState {
         rampage: Option<RampageState>,
         recharge_slot: Option<u8>,
         reflect: bool,
+        rest_atk_penalty: bool,
+        rest_spd_penalty: bool,
         seeded: bool,
-        sleep_elapsed: Option<u8>,
+        sleep: Option<Sleep>,
         trapping: Option<TrappingState>,
         underground: bool,
     ) -> Self {
@@ -295,6 +352,7 @@ impl CombatantState {
             disabled,
             focus_energy,
             frozen,
+            light_screen,
             mist,
             paralyzed,
             poisoned,
@@ -302,8 +360,10 @@ impl CombatantState {
             rampage,
             recharge_slot,
             reflect,
+            rest_atk_penalty,
+            rest_spd_penalty,
             seeded,
-            sleep_elapsed,
+            sleep,
             trapping,
             underground,
         }
@@ -319,7 +379,7 @@ impl CombatantState {
 
     fn build_rage(&mut self, hits: u16) {
         if self.hp > 0 && self.rage_accuracy.is_some() {
-            self.stages.atk = (i16::from(self.stages.atk) + hits.cast_signed()).min(6) as i8;
+            self.change_atk_stage(hits.cast_signed());
         }
     }
 
@@ -362,6 +422,7 @@ impl CombatantState {
             disabled: None,
             focus_energy: false,
             frozen: false,
+            light_screen: false,
             mist: false,
             paralyzed: false,
             poisoned: false,
@@ -369,8 +430,10 @@ impl CombatantState {
             rampage: None,
             recharge_slot: None,
             reflect: false,
+            rest_atk_penalty: false,
+            rest_spd_penalty: false,
             seeded: false,
-            sleep_elapsed: None,
+            sleep: None,
             trapping: None,
             underground: false,
         }
@@ -486,6 +549,13 @@ impl StatStages {
         };
         stat * numerator / denominator
     }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+enum Sleep {
+    Inflicted(u8),
+    Resting,
+    WakingFromRest,
 }
 
 #[derive(Clone, Eq, Hash, PartialEq)]

@@ -67,6 +67,7 @@ pub enum MoveKind {
     LeechLife,
     LeechSeed,
     Leer,
+    Lick,
     LightScreen,
     LowKick,
     Meditate,
@@ -77,6 +78,7 @@ pub enum MoveKind {
     Mimic,
     Minimize,
     MirrorMove,
+    NightShade,
     PayDay,
     Peck,
     PetalDance,
@@ -115,6 +117,7 @@ pub enum MoveKind {
     Solarbeam,
     Sonicboom,
     SpikeCannon,
+    Splash,
     Spore,
     Stomp,
     StringShot,
@@ -213,6 +216,7 @@ impl MoveKind {
             Self::LeechLife => "Leech Life",
             Self::LeechSeed => "Leech Seed",
             Self::Leer => "Leer",
+            Self::Lick => "Lick",
             Self::LightScreen => "Light Screen",
             Self::LowKick => "Low Kick",
             Self::Meditate => "Meditate",
@@ -223,6 +227,7 @@ impl MoveKind {
             Self::Mimic => "Mimic",
             Self::Minimize => "Minimize",
             Self::MirrorMove => "Mirror Move",
+            Self::NightShade => "Night Shade",
             Self::PayDay => "Pay Day",
             Self::Peck => "Peck",
             Self::PetalDance => "Petal Dance",
@@ -261,6 +266,7 @@ impl MoveKind {
             Self::Solarbeam => "Solarbeam",
             Self::Sonicboom => "Sonicboom",
             Self::SpikeCannon => "Spike Cannon",
+            Self::Splash => "Splash",
             Self::Spore => "Spore",
             Self::Stomp => "Stomp",
             Self::StringShot => "String Shot",
@@ -320,8 +326,16 @@ impl Move {
         (self.accuracy as u16 * 255 / 100) as u8
     }
 
-    pub(crate) const fn fixed_damage(&self) -> Option<u16> {
-        if matches!(self.kind, MoveKind::Sonicboom) { Some(20) } else { None }
+    pub(crate) const fn fixed_damage(&self, level: u8) -> Option<u16> {
+        if matches!(self.kind, MoveKind::NightShade | MoveKind::SeismicToss) {
+            Some(level as u16)
+        } else if matches!(self.kind, MoveKind::Sonicboom) {
+            Some(20)
+        } else if matches!(self.kind, MoveKind::DragonRage) {
+            Some(40)
+        } else {
+            None
+        }
     }
 
     pub(crate) const fn name(&self) -> &'static str {

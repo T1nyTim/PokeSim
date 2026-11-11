@@ -53,6 +53,7 @@ pub enum Item {
     Iron,
     LeafStone,
     MoonStone,
+    Potion,
     PpUp,
     Protein,
     RareCandy,
@@ -75,6 +76,7 @@ impl Item {
             | Self::Iron
             | Self::LeafStone
             | Self::MoonStone
+            | Self::Potion
             | Self::PpUp
             | Self::Protein
             | Self::RareCandy
@@ -99,6 +101,7 @@ impl Item {
             Self::Iron => "Iron",
             Self::LeafStone => "Leaf Stone",
             Self::MoonStone => "Moon Stone",
+            Self::Potion => "Potion",
             Self::PpUp => "PP Up",
             Self::Protein => "Protein",
             Self::RareCandy => "Rare Candy",
@@ -114,6 +117,7 @@ impl Item {
     pub(super) const fn battle_heal_amount(&self) -> Option<u16> {
         match self {
             Self::HyperPotion => Some(200),
+            Self::Potion => Some(20),
             Self::SuperPotion => Some(50),
             Self::Calcium
             | Self::Carbos
@@ -160,6 +164,7 @@ pub enum SpeciesKind {
     Exeggcute,
     Exeggutor,
     Fearow,
+    Gastly,
     Geodude,
     Gloom,
     Golbat,
@@ -167,6 +172,8 @@ pub enum SpeciesKind {
     Graveler,
     Grimer,
     Growlithe,
+    Gyarados,
+    Haunter,
     Horsea,
     Hypno,
     Ivysaur,
@@ -177,6 +184,7 @@ pub enum SpeciesKind {
     Koffing,
     Machoke,
     Machop,
+    Magikarp,
     Magnemite,
     Magneton,
     Mankey,
@@ -218,6 +226,7 @@ pub enum SpeciesKind {
     Shellder,
     Slowbro,
     Slowpoke,
+    Snorlax,
     Spearow,
     Squirtle,
     Starmie,
@@ -267,6 +276,7 @@ impl SpeciesKind {
             Self::Exeggcute => "Exeggcute",
             Self::Exeggutor => "Exeggutor",
             Self::Fearow => "Fearow",
+            Self::Gastly => "Gastly",
             Self::Geodude => "Geodude",
             Self::Gloom => "Gloom",
             Self::Golbat => "Golbat",
@@ -274,6 +284,8 @@ impl SpeciesKind {
             Self::Graveler => "Graveler",
             Self::Grimer => "Grimer",
             Self::Growlithe => "Growlithe",
+            Self::Gyarados => "Gyarados",
+            Self::Haunter => "Haunter",
             Self::Horsea => "Horsea",
             Self::Hypno => "Hypno",
             Self::Ivysaur => "Ivysaur",
@@ -284,6 +296,7 @@ impl SpeciesKind {
             Self::Koffing => "Koffing",
             Self::Machoke => "Machoke",
             Self::Machop => "Machop",
+            Self::Magikarp => "Magikarp",
             Self::Magnemite => "Magnemite",
             Self::Magneton => "Magneton",
             Self::Mankey => "Mankey",
@@ -325,6 +338,7 @@ impl SpeciesKind {
             Self::Shellder => "Shellder",
             Self::Slowbro => "Slowbro",
             Self::Slowpoke => "Slowpoke",
+            Self::Snorlax => "Snorlax",
             Self::Spearow => "Spearow",
             Self::Squirtle => "Squirtle",
             Self::Starmie => "Starmie",

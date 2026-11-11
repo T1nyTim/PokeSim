@@ -192,6 +192,14 @@ pub const FEAROW: Species = Species::new(
     &[],
     &[(9, &LEER), (15, &FURY_ATTACK), (25, &MIRROR_MOVE), (34, &DRILL_PECK), (43, &AGILITY)]
 );
+pub const GASTLY: Species = Species::new(
+    SpeciesKind::Gastly, BaseStats::new(30, 35, 30, 80, 100), [Type::Ghost, Type::Poison], 95,
+    [Some(&LICK), Some(&CONFUSE_RAY), Some(&NIGHT_SHADE), None], GrowthRate::MediumSlow,
+    &[&TOXIC, &RAGE, &MEGA_DRAIN, &THUNDERBOLT, &THUNDER, &PSYCHIC, &MIMIC, &DOUBLE_TEAM, &BIDE, &SELFDESTRUCT, &DREAM_EATER, &REST, &PSYWAVE,
+        &EXPLOSION, &SUBSTITUTE],
+    &[(Evolve::Level(25), &HAUNTER)],
+    &[(27, &HYPNOSIS), (35, &DREAM_EATER)]
+);
 pub const GEODUDE: Species = Species::new(
     SpeciesKind::Geodude, BaseStats::new(40, 80, 100, 20, 30), [Type::Rock, Type::Ground], 86,
     [Some(&TACKLE), None, None, None], GrowthRate::MediumSlow,
@@ -246,6 +254,22 @@ pub const GROWLITHE: Species = Species::new(
         &REST, &SUBSTITUTE],
     &[(Evolve::Item(Item::FireStone), &ARCANINE)],
     &[(18, &EMBER), (23, &LEER), (30, &TAKE_DOWN), (39, &AGILITY), (50, &FLAMETHROWER)],
+);
+pub const GYARADOS: Species = Species::new(
+    SpeciesKind::Gyarados, BaseStats::new(95, 125, 79, 81, 100), [Type::Water, Type::Flying], 214,
+    [Some(&BITE), Some(&DRAGON_RAGE), Some(&LEER), Some(&HYDRO_PUMP)], GrowthRate::Slow,
+    &[&TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &HYPER_BEAM, &RAGE, &DRAGON_RAGE, &THUNDERBOLT,
+        &THUNDER, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &FIRE_BLAST, &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[],
+    &[(20, &BITE), (25, &DRAGON_RAGE), (32, &LEER), (41, &HYDRO_PUMP), (52, &HYPER_BEAM)]
+);
+pub const HAUNTER: Species = Species::new(
+    SpeciesKind::Haunter, BaseStats::new(45, 50, 45, 95, 115), [Type::Ghost, Type::Poison], 126,
+    [Some(&LICK), Some(&CONFUSE_RAY), Some(&NIGHT_SHADE), None], GrowthRate::MediumSlow,
+    &[&TOXIC, &RAGE, &MEGA_DRAIN, &THUNDERBOLT, &THUNDER, &PSYCHIC, &MIMIC, &DOUBLE_TEAM, &BIDE, &SELFDESTRUCT, &DREAM_EATER, &REST, &PSYWAVE,
+        &EXPLOSION, &SUBSTITUTE],
+    &[],
+    &[(29, &HYPNOSIS), (38, &DREAM_EATER)]
 );
 pub const HORSEA: Species = Species::new(
     SpeciesKind::Horsea, BaseStats::new(30, 40, 70, 60, 70), [Type::Water, Type::Water], 83,
@@ -327,6 +351,13 @@ pub const MACHOP: Species = Species::new(
         &MIMIC, &DOUBLE_TEAM, &BIDE, &METRONOME, &FIRE_BLAST, &SKULL_BASH, &REST, &ROCK_SLIDE, &SUBSTITUTE],
     &[(Evolve::Level(28), &MACHOKE)],
     &[(20, &LOW_KICK), (25, &LEER), (32, &FOCUS_ENERGY), (39, &SEISMIC_TOSS), (46, &SUBMISSION)]
+);
+pub const MAGIKARP: Species = Species::new(
+    SpeciesKind::Magikarp, BaseStats::new(20, 10, 55, 80, 20), [Type::Water, Type::Water], 20,
+    [Some(&SPLASH), None, None, None], GrowthRate::Slow,
+    &[],
+    &[(Evolve::Level(20), &GYARADOS)],
+    &[(15, &TACKLE)]
 );
 pub const MAGNEMITE: Species = Species::new(
     SpeciesKind::Magnemite, BaseStats::new(25, 35, 70, 45, 95), [Type::Electric, Type::Electric], 89,
@@ -657,6 +688,15 @@ pub const SLOWPOKE: Species = Species::new(
     &SUBSTITUTE],
     &[(Evolve::Level(37), &SLOWBRO)],
     &[(18, &DISABLE), (22, &HEADBUTT), (27, &GROWL), (33, &WATER_GUN), (40, &AMNESIA), (48, &PSYCHIC)]
+);
+pub const SNORLAX: Species = Species::new(
+    SpeciesKind::Snorlax, BaseStats::new(160, 110, 65, 30, 65), [Type::Normal, Type::Normal], 154,
+    [Some(&HEADBUTT), Some(&AMNESIA), Some(&REST), None], GrowthRate::Slow,
+    &[&MEGA_PUNCH, &MEGA_KICK, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &BUBBLEBEAM, &WATER_GUN, &ICE_BEAM, &BLIZZARD, &HYPER_BEAM, &PAY_DAY,
+        &SUBMISSION, &COUNTER, &SEISMIC_TOSS, &RAGE, &SOLARBEAM, &THUNDERBOLT, &THUNDER, &EARTHQUAKE, &FISSURE, &PSYCHIC, &MIMIC, &DOUBLE_TEAM,
+        &REFLECT, &BIDE, &METRONOME, &SELFDESTRUCT, &FIRE_BLAST, &SKULL_BASH, &REST, &PSYWAVE, &ROCK_SLIDE, &SUBSTITUTE],
+    &[],
+    &[(35, &BODY_SLAM), (41, &HARDEN), (48, &DOUBLE_EDGE), (56, &HYPER_BEAM)]
 );
 pub const SPEAROW: Species = Species::new(
     SpeciesKind::Spearow, BaseStats::new(40, 60, 30, 70, 31), [Type::Normal, Type::Flying], 58,
