@@ -1,7 +1,7 @@
 use core::array;
 
 use crate::{
-    battle::state::{BideState, CombatantState, DisableState},
+    battle::state::{BideState, DisableState, combatant::CombatantState},
     data::Type,
 };
 
@@ -62,7 +62,8 @@ pub enum Effect {
     SpecialUp2,
     SpeedDown,
     SpeedDownSide,
-    SpeedUp,
+    SpeedUp1,
+    SpeedUp2,
     Splash,
     Substitute,
     SuperFang,
@@ -100,7 +101,8 @@ impl Effect {
                 | Self::SpecialUp1
                 | Self::SpecialUp2
                 | Self::SpeedDown
-                | Self::SpeedUp
+                | Self::SpeedUp1
+                | Self::SpeedUp2
                 | Self::Swift // | Self::Transform
         )
     }
@@ -200,7 +202,8 @@ impl Effect {
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
-            | Self::SpeedUp
+            | Self::SpeedUp1
+            | Self::SpeedUp2
             | Self::Splash => EffectResolution::Status,
             Self::SwitchAndTeleport => EffectResolution::SwitchOrEscape,
             Self::AttackTwice | Self::DreamEater | Self::Haze | Self::Metronome | Self::Substitute => todo!(),
@@ -223,7 +226,8 @@ impl Effect {
                 | Self::Reflect
                 | Self::SpecialUp1
                 | Self::SpecialUp2
-                | Self::SpeedUp
+                | Self::SpeedUp1
+                | Self::SpeedUp2
                 | Self::Splash
                 | Self::Substitute
         )
@@ -295,7 +299,8 @@ impl Effect {
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedDownSide
-            | Self::SpeedUp
+            | Self::SpeedUp1
+            | Self::SpeedUp2
             | Self::Substitute
             | Self::SuperFang
             | Self::Swift
@@ -363,7 +368,8 @@ impl Effect {
             | Self::SpecialUp1
             | Self::SpecialUp2
             | Self::SpeedDown
-            | Self::SpeedUp
+            | Self::SpeedUp1
+            | Self::SpeedUp2
             | Self::Splash
             | Self::Substitute
             | Self::SuperFang
@@ -480,7 +486,8 @@ impl Effect {
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedDownSide
-            | Self::SpeedUp
+            | Self::SpeedUp1
+            | Self::SpeedUp2
             | Self::Splash
             | Self::Substitute
             | Self::SuperFang
@@ -538,7 +545,7 @@ impl Effect {
             | Self::ThrashPetalDance
             | Self::Trapping
             | Self::TwoToFiveAttacks => probability,
-            Self::AttackTwice | Self::Haze | Self::Metronome | Self::MirrorMove | Self::SpeedUp | Self::Twineedle => todo!(),
+            Self::AttackTwice | Self::Haze | Self::Metronome | Self::MirrorMove | Self::Twineedle => todo!(),
             Self::AttackUp1
             | Self::AttackUp2
             | Self::Bide
@@ -552,6 +559,8 @@ impl Effect {
             | Self::Reflect
             | Self::SpecialUp1
             | Self::SpecialUp2
+            | Self::SpeedUp1
+            | Self::SpeedUp2
             | Self::Splash
             | Self::Substitute
             | Self::Swift
@@ -649,7 +658,8 @@ impl Effect {
             | Self::SpecialUp2
             | Self::SpeedDown
             | Self::SpeedDownSide
-            | Self::SpeedUp
+            | Self::SpeedUp1
+            | Self::SpeedUp2
             | Self::Splash
             | Self::Substitute
             | Self::SuperFang
@@ -695,7 +705,8 @@ impl Effect {
             Self::SpecialUp1 => target.stages.spc = (target.stages.spc + 1).min(6),
             Self::SpecialUp2 => target.stages.spc = (target.stages.spc + 2).min(6),
             Self::SpeedDown | Self::SpeedDownSide => target.change_spd_stage(-1),
-            Self::SpeedUp => target.change_spd_stage(1),
+            Self::SpeedUp1 => target.change_spd_stage(1),
+            Self::SpeedUp2 => target.change_spd_stage(2),
             Self::AttackTwice
             | Self::Bide
             | Self::BurnSide1

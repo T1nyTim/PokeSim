@@ -3,7 +3,7 @@ pub mod data;
 use core::array;
 
 use crate::{
-    battle::state::CombatantState,
+    battle::state::combatant::CombatantState,
     data::{BaseStats, Species, effects::Effect, move_data::Move},
     journey::PlayerPolicy,
     player::StatExp,

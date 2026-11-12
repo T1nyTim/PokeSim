@@ -5,7 +5,8 @@ use crate::{
         Side,
         combatant::Combatant,
         state::{
-            BideState, CombatantState,
+            BideState,
+            combatant::CombatantState,
             key::{BattleKey, CombatantKey},
         },
     },
@@ -20,6 +21,8 @@ pub struct BattleState {
     pub player_pp: [u8; 4],
     last_damage: u16,
     pub ai_items_left: u8,
+    pub last_player_move: Option<u8>,
+    pub ai_copied_move: Option<u8>,
 }
 
 #[expect(clippy::missing_trait_methods, reason = "hash_slice method not required")]
@@ -37,9 +40,12 @@ impl BattleState {
         self.player.bide.is_none() && self.ai.bide.is_none() && !self.combatant(side).seeded
     }
 
-    pub(crate) const fn clear_unused_damage(&mut self) {
+    pub(crate) const fn clear_unused_state(&mut self) {
         if self.player.bide.is_none() && self.ai.bide.is_none() {
             self.last_damage = 0;
+        }
+        if self.ai_copied_move.is_some() && self.ai.charging_slot.is_none() && self.ai.rampage.is_none() {
+            self.ai_copied_move = None;
         }
     }
 
@@ -220,7 +226,10 @@ impl BattleState {
             | (u8::from(self.player.mist) << 6u8)
             | (u8::from(self.ai.mist) << 7u8);
         let [pp1, pp2, pp3, pp4] = self.player_pp;
-        let [dmg_low, dmg_high] = self.last_damage.to_le_bytes();
+        let dmg_and_moves = self.last_damage
+            | (self.last_player_move.map_or(0, |slot| u16::from(slot) + 1) << 10u8)
+            | (self.ai_copied_move.map_or(0, |slot| u16::from(slot) + 1) << 13u8);
+        let [dmg_low, dmg_high] = dmg_and_moves.to_le_bytes();
         BattleKey::new(
             CombatantKey::new(&self.player),
             CombatantKey::new(&self.ai),
@@ -235,6 +244,8 @@ impl BattleState {
             player_pp: player.pokemon.move_pp(),
             last_damage: 0,
             ai_items_left,
+            last_player_move: None,
+            ai_copied_move: None,
         }
     }
 
@@ -279,13 +290,15 @@ impl BattleState {
         self.ai_items_left -= 1;
     }
 
-    pub(super) const fn from_key(player: CombatantState, ai: CombatantState, player_pp: [u8; 4], last_damage: u16, ai_items_left: u8) -> Self {
+    pub(super) const fn from_key(player: CombatantState, ai: CombatantState, player_pp: [u8; 4], dmg_and_moves: u16, ai_items_left: u8) -> Self {
         Self {
             player,
             ai,
             player_pp,
-            last_damage,
+            last_damage: dmg_and_moves & 0x03FF,
             ai_items_left,
+            last_player_move: (((dmg_and_moves >> 10) & 7) as u8).checked_sub(1),
+            ai_copied_move: ((dmg_and_moves >> 13) as u8).checked_sub(1),
         }
     }
 }

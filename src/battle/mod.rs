@@ -20,7 +20,7 @@ use crate::{
     data::{
         effects::{Effect, EffectResolution},
         move_data::Move,
-        moves::{BIDE, RAGE},
+        moves::{BIDE, RAGE, STRUGGLE},
     },
     journey::{MatchupGroup, MatchupKind, PlayerPolicy, TrainerItem},
     player::Player,
@@ -43,6 +43,7 @@ pub struct Battle<'battle> {
     ai: Combatant<'battle>,
     ai_choices: [AiChoices; 20],
     ai_item: Option<&'battle TrainerItem>,
+    ai_has_mirror_move: bool,
     is_trainer: bool,
     batch_turns: bool,
     remaining_turns: usize,
@@ -50,9 +51,13 @@ pub struct Battle<'battle> {
 }
 
 impl<'battle> Battle<'battle> {
+    const STRUGGLE_SLOT: u8 = 4;
+
     pub(super) fn new(player: &'battle Player, ai: &'battle Pokemon, matchup: &'battle MatchupGroup) -> Self {
-        let player_combatant = Combatant::new(&player.active, player.stats());
-        let ai_combatant = Combatant::new(ai, ai.stats());
+        let ai_has_mirror_move = ai.moves.iter().flatten().any(|mv| matches!(mv.effect, Effect::MirrorMove));
+        let copyable_moves = if ai_has_mirror_move { player.active.moves.as_slice() } else { &[] };
+        let player_combatant = Combatant::new(&player.active, player.stats(), &[]);
+        let ai_combatant = Combatant::new(ai, ai.stats(), copyable_moves);
         Self {
             states: StateAccumulator::default(),
             next_actions: StateMap::default(),
@@ -70,6 +75,7 @@ impl<'battle> Battle<'battle> {
                 )
             }),
             ai_item: matchup.ai.item(),
+            ai_has_mirror_move,
             is_trainer: !matches!(matchup.kind, MatchupKind::Wild),
             batch_turns: false,
             remaining_turns: 0,
@@ -214,7 +220,25 @@ impl<'battle> Battle<'battle> {
 
     fn execute_move(&mut self, mut branch: Branch, mut probability: f64, ending_rampage: bool) {
         let side = branch.turn.side.expect("Executing a move requires an acting side");
-        let (slot, mv) = branch.turn.selected_move();
+        let (slot, selected_mv) = branch.turn.selected_move();
+        let mv = if side == Side::Ai && matches!(selected_mv.effect, Effect::MirrorMove) {
+            let Some(copied_slot) = branch.state.last_player_move else {
+                self.finish_action(branch, probability);
+                return;
+            };
+            let copied_mv = self.player_move_at(copied_slot);
+            if matches!(copied_mv.effect, Effect::MirrorMove) {
+                self.finish_action(branch, probability);
+                return;
+            }
+            branch.turn.actions[1] = Some(TurnAction::new(Some((slot, copied_mv))));
+            if matches!(copied_mv.effect, Effect::Charge | Effect::ThrashPetalDance) {
+                branch.state.ai_copied_move = Some(copied_slot);
+            }
+            copied_mv
+        } else {
+            selected_mv
+        };
         let resolution = mv.effect.resolution();
         if matches!(resolution, EffectResolution::Charge) {
             let charging_combatant = branch.state.combatant_mut(side);
@@ -233,6 +257,14 @@ impl<'battle> Battle<'battle> {
             } else {
                 attacker.start_rampage(slot.expect("A rampage move must have a move slot"), mv.accuracy());
             }
+        }
+        if self.ai_has_mirror_move && side == Side::Player {
+            branch.state.last_player_move = if mv == &STRUGGLE {
+                Some(Self::STRUGGLE_SLOT)
+            } else {
+                slot.or_else(|| self.player.pokemon.moves.iter().position(|known_mv| *known_mv == Some(mv)))
+                    .map(|mv_slot| mv_slot as u8)
+            };
         }
         branch.state.begin_move(side, pp_slot, &mv.effect);
         if self.is_trainer && matches!(resolution, EffectResolution::SwitchOrEscape) {
@@ -340,7 +372,7 @@ impl<'battle> Battle<'battle> {
 
     fn finish_action_rolls(&mut self, mut branch: Branch, outcomes: impl Iterator<Item = (u16, f64)>) {
         let rolls = outcomes.filter(|&(_, probability)| probability != 0.0f64);
-        branch.state.clear_unused_damage();
+        branch.state.clear_unused_state();
         if let Some(winner) = branch.state.winner() {
             for (_, probability) in rolls {
                 self.outcome.record(winner, probability);
@@ -383,6 +415,14 @@ impl<'battle> Battle<'battle> {
         }
     }
 
+    fn player_move_at(&self, slot: u8) -> &'static Move {
+        if slot == Self::STRUGGLE_SLOT {
+            &STRUGGLE
+        } else {
+            self.player.pokemon.moves[usize::from(slot)].expect("A copied move must still be known")
+        }
+    }
+
     fn resolve_action(&mut self, mut branch: Branch, mut probability: f64) {
         if probability == 0.0f64 {
             return;
@@ -403,6 +443,9 @@ impl<'battle> Battle<'battle> {
                     return;
                 }
             }
+        }
+        if self.ai_has_mirror_move && side == Side::Player && (branch.state.player.is_asleep() || branch.state.player.frozen) {
+            branch.state.last_player_move = None;
         }
         if let Some(wake_prob) = branch.state.combatant_mut(side).advance_sleep() {
             if wake_prob < 1.0f64 {
@@ -630,6 +673,8 @@ impl<'battle> Battle<'battle> {
             TurnAction::Move(None, mv)
         } else if state.is_biding(Side::Ai) {
             TurnAction::Move(None, &BIDE)
+        } else if let Some(copied_slot) = state.ai_copied_move {
+            TurnAction::Move(None, self.player_move_at(copied_slot))
         } else if let Some(slot) = state
             .ai
             .recharge_slot

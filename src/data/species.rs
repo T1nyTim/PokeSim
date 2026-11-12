@@ -136,6 +136,22 @@ pub const DIGLETT: Species = Species::new(
     &[(Evolve::Level(26), &DUGTRIO)],
     &[(15, &GROWL), (19, &DIG), (24, &SAND_ATTACK), (31, &SLASH), (40, &EARTHQUAKE)]
 );
+pub const DODRIO: Species = Species::new(
+    SpeciesKind::Dodrio, BaseStats::new(60, 110, 70, 100, 60), [Type::Normal, Type::Flying], 158,
+    [Some(&PECK), Some(&GROWL), Some(&FURY_ATTACK), None], GrowthRate::MediumFast,
+    &[&WHIRLWIND, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &HYPER_BEAM, &RAGE, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &SKULL_BASH, &SKY_ATTACK,
+        &REST, &TRI_ATTACK, &SUBSTITUTE],
+    &[],
+    &[(20, &GROWL), (24, &FURY_ATTACK), (30, &DRILL_PECK), (39, &RAGE), (45, &TRI_ATTACK), (51, &AGILITY)]
+);
+pub const DODUO: Species = Species::new(
+    SpeciesKind::Doduo, BaseStats::new(35, 85, 45, 75, 35), [Type::Normal, Type::Flying], 96,
+    [Some(&PECK), None, None, None], GrowthRate::MediumFast,
+    &[&WHIRLWIND, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &RAGE, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &SKULL_BASH, &SKY_ATTACK, &REST,
+        &TRI_ATTACK, &SUBSTITUTE],
+    &[(Evolve::Level(31), &DODRIO)],
+    &[(20, &GROWL), (24, &FURY_ATTACK), (30, &DRILL_PECK), (36, &RAGE), (40, &TRI_ATTACK), (44, &AGILITY)]
+);
 pub const DROWZEE: Species = Species::new(
     SpeciesKind::Drowzee, BaseStats::new(60, 48, 45, 42, 90), [Type::Psychic, Type::Psychic], 102,
     [Some(&POUND), Some(&HYPNOSIS), None, None], GrowthRate::MediumFast,
@@ -183,6 +199,14 @@ pub const EXEGGUTOR: Species = Species::new(
         &SELFDESTRUCT, &EGG_BOMB, &REST, &PSYWAVE, &EXPLOSION, &SUBSTITUTE],
     &[],
     &[(28, &STOMP)]
+);
+pub const FARFETCHD: Species = Species::new(
+    SpeciesKind::Farfetchd, BaseStats::new(52, 65, 55, 60, 58), [Type::Normal, Type::Flying], 94,
+    [Some(&PECK), Some(&SAND_ATTACK), None, None], GrowthRate::MediumFast,
+    &[&RAZOR_WIND, &SWORDS_DANCE, &WHIRLWIND, &TOXIC, &BODY_SLAM, &TAKE_DOWN, &DOUBLE_EDGE, &RAGE, &MIMIC, &DOUBLE_TEAM, &REFLECT, &BIDE, &SWIFT,
+        &SKULL_BASH, &REST, &SUBSTITUTE],
+    &[],
+    &[(7, &LEER), (15, &FURY_ATTACK), (23, &SWORDS_DANCE), (31, &AGILITY), (39, &SLASH)]
 );
 pub const FEAROW: Species = Species::new(
     SpeciesKind::Fearow, BaseStats::new(65, 90, 65, 100, 61), [Type::Normal, Type::Flying], 162,

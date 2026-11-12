@@ -3,3 +3,4 @@
 /scripts
 
 mod_*.rs
+combatant_state.rs

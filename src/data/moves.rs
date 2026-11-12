@@ -3,7 +3,7 @@ use crate::data::{Move, Type, effects::Effect, move_data::MoveKind};
 pub const ABSORB: Move = Move::new(MoveKind::Absorb, Effect::DrainHp, 20, Type::Grass, 100, 20);
 pub const ACID: Move = Move::new(MoveKind::Acid, Effect::DefenseDownSide, 40, Type::Poison, 100, 30);
 pub const ACID_ARMOR: Move = Move::new(MoveKind::AcidArmor, Effect::DefenseUp2, 0, Type::Poison, 100, 40);
-pub const AGILITY: Move = Move::new(MoveKind::Agility, Effect::SpeedUp, 0, Type::Psychic, 100, 30);
+pub const AGILITY: Move = Move::new(MoveKind::Agility, Effect::SpeedUp2, 0, Type::Psychic, 100, 30);
 pub const AMNESIA: Move = Move::new(MoveKind::Amnesia, Effect::SpecialUp2, 0, Type::Psychic, 100, 20);
 pub const AURORA_BEAM: Move = Move::new(MoveKind::AuroraBeam, Effect::AttackDownSide, 65, Type::Ice, 100, 20);
 pub const BARRAGE: Move = Move::new(MoveKind::Barrage, Effect::TwoToFiveAttacks, 15, Type::Normal, 85, 20);

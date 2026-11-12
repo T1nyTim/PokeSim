@@ -4,7 +4,7 @@ use alloc::{collections::BTreeMap, rc::Rc};
 use core::{array, cell::OnceCell};
 
 use crate::{
-    battle::state::{CombatantState, StatStages, key::StateMap},
+    battle::state::{StatStages, combatant::CombatantState, key::StateMap},
     data::{effects::Effect, move_data::Move, moves::STRUGGLE},
     pokemon::{Pokemon, Stats},
 };
@@ -113,7 +113,7 @@ impl<'battle> Combatant<'battle> {
         state.speed(self.stats.spd) >= target_state.speed(target.stats.spd)
     }
 
-    pub(super) fn new(pokemon: &'battle Pokemon, stats: Stats) -> Self {
+    pub(super) fn new(pokemon: &'battle Pokemon, stats: Stats, copyable_moves: &[Option<&'static Move>]) -> Self {
         Self {
             pokemon,
             stats,
@@ -122,6 +122,7 @@ impl<'battle> Combatant<'battle> {
                 .into_iter()
                 .flatten()
                 .chain([&STRUGGLE])
+                .chain(copyable_moves.iter().copied().flatten())
                 .map(|mv| (mv, DamageRollCache::new()))
                 .collect(),
         }

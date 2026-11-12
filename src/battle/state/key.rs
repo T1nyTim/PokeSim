@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::{
     battle::{
         Side,
-        state::{BideState, CombatantState, DisableState, RampageState, Sleep, StatStages, TrappingState, battle::BattleState},
+        state::{BideState, DisableState, RampageState, Sleep, StatStages, TrappingState, battle::BattleState, combatant::CombatantState},
     },
     data::move_data::Move,
 };

@@ -7,8 +7,8 @@ use crate::{
 
 // pub const AGATHA: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 pub const BEAUTY: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
-// pub const BIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
-// pub const BIRD_KEEPER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const BIKER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
+pub const BIRD_KEEPER: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const BLACKBELT: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
 // pub const BLAINE: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition, AiPolicy::TypeEffectiveness];
 pub const BROCK: &[AiPolicy] = &[AiPolicy::DecreaseStatusCondition];
