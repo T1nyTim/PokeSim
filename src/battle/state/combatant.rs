@@ -8,40 +8,76 @@ use crate::{
     },
 };
 
+#[derive(Clone, Default, Eq, PartialEq)]
+pub(crate) struct CombatantFlags(u16);
+
+impl CombatantFlags {
+    pub(crate) const FOCUS_ENERGY: u16 = 1 << 6;
+    pub(crate) const LIGHT_SCREEN: u16 = 1 << 14;
+    pub(crate) const UNDERGROUND: u16 = 1 << 7;
+    pub(super) const BURNED: u16 = 1 << 3;
+    pub(super) const POISONED: u16 = 1 << 0;
+    pub(super) const SEEDED: u16 = 1 << 1;
+    const PARALYZED: u16 = 1 << 5;
+    const REST_ATK_PENALTY: u16 = 1 << 12;
+    const REST_SPD_PENALTY: u16 = 1 << 13;
+
+    pub(crate) const fn has_any(&self, mask: u16) -> bool {
+        self.0 & mask != 0
+    }
+
+    pub(crate) const fn insert(&mut self, mask: u16) {
+        self.0 |= mask;
+    }
+
+    pub(super) const fn from_key(flags: u8, spd_and_flags: u8) -> Self {
+        let mask = Self::POISONED
+            | Self::SEEDED
+            | Self::BURNED
+            | Self::PARALYZED
+            | Self::FOCUS_ENERGY
+            | Self::UNDERGROUND
+            | Self::REST_ATK_PENALTY
+            | Self::REST_SPD_PENALTY
+            | Self::LIGHT_SCREEN;
+        Self(u16::from_le_bytes([flags, spd_and_flags]) & mask)
+    }
+
+    pub(super) const fn key_bytes(&self) -> [u8; 2] {
+        self.0.to_le_bytes()
+    }
+
+    const fn remove(&mut self, mask: u16) {
+        self.0 &= !mask;
+    }
+}
+
 #[derive(Clone, Eq, PartialEq)]
 pub struct CombatantState {
     pub hp: u16,
+    pub flags: CombatantFlags,
     pub stages: StatStages,
     pub bide: Option<BideState>,
-    pub burned: bool,
     pub charging_slot: Option<u8>,
     pub confusion_elapsed: Option<u8>,
     pub disabled: Option<DisableState>,
-    pub focus_energy: bool,
     pub frozen: bool,
-    pub light_screen: bool,
     pub mist: bool,
-    pub paralyzed: bool,
-    pub poisoned: bool,
     pub rage_accuracy: Option<u8>,
     pub rampage: Option<RampageState>,
     pub recharge_slot: Option<u8>,
     pub reflect: bool,
-    pub rest_atk_penalty: bool,
-    pub rest_spd_penalty: bool,
-    pub seeded: bool,
     pub sleep: Option<Sleep>,
     pub trapping: Option<TrappingState>,
-    pub underground: bool,
 }
 
 impl CombatantState {
     pub(crate) const fn attack_halved(&self) -> bool {
-        self.burned || self.rest_atk_penalty
+        self.flags.has_any(CombatantFlags::BURNED | CombatantFlags::REST_ATK_PENALTY)
     }
 
     pub(crate) const fn burn(&mut self) {
-        self.burned = true;
+        self.flags.insert(CombatantFlags::BURNED);
     }
 
     pub(crate) const fn can_be_confused(&self) -> bool {
@@ -84,17 +120,16 @@ impl CombatantState {
 
     pub(crate) const fn fall_asleep(&mut self) {
         if self.recharge_slot.take().is_some() {
-            self.burned = false;
+            self.flags
+                .remove(CombatantFlags::BURNED | CombatantFlags::PARALYZED | CombatantFlags::POISONED);
             self.frozen = false;
-            self.paralyzed = false;
-            self.poisoned = false;
         }
         self.sleep = Some(Sleep::Inflicted(0));
     }
 
     pub(crate) const fn finish_charging(&mut self) {
         self.charging_slot = None;
-        self.underground = false;
+        self.flags.remove(CombatantFlags::UNDERGROUND);
     }
 
     pub(crate) const fn finish_rampage(&mut self) {
@@ -103,11 +138,18 @@ impl CombatantState {
     }
 
     pub(crate) const fn full_paralysis_probability(&self) -> f64 {
-        if self.paralyzed { 63.0 / 256.0 } else { 0.0 }
+        if self.flags.has_any(CombatantFlags::PARALYZED) {
+            63.0 / 256.0
+        } else {
+            0.0
+        }
     }
 
     pub(crate) const fn has_status_condition(&self) -> bool {
-        self.burned || self.frozen || self.paralyzed || self.poisoned || self.is_asleep()
+        self.flags
+            .has_any(CombatantFlags::BURNED | CombatantFlags::PARALYZED | CombatantFlags::POISONED)
+            || self.frozen
+            || self.is_asleep()
     }
 
     pub(crate) const fn interrupt_move(&mut self) {
@@ -122,11 +164,11 @@ impl CombatantState {
     }
 
     pub(crate) const fn paralyze(&mut self) {
-        self.paralyzed = true;
+        self.flags.insert(CombatantFlags::PARALYZED);
     }
 
     pub(crate) const fn poison(&mut self) {
-        self.poisoned = true;
+        self.flags.insert(CombatantFlags::POISONED);
     }
 
     pub(crate) const fn start_rampage(&mut self, slot: usize, accuracy: u8) {
@@ -186,14 +228,14 @@ impl CombatantState {
     }
 
     pub(crate) fn can_be_seeded(&self, types: &[Type; 2]) -> bool {
-        !self.seeded && !types.contains(&Type::Grass)
+        !self.flags.has_any(CombatantFlags::SEEDED) && !types.contains(&Type::Grass)
     }
 
     pub(crate) fn change_atk_stage(&mut self, change: i16) {
         let stage = (i16::from(self.stages.atk) + change).clamp(-6, 6) as i8;
         if stage != self.stages.atk {
             self.stages.atk = stage;
-            self.rest_atk_penalty = false;
+            self.flags.remove(CombatantFlags::REST_ATK_PENALTY);
         }
     }
 
@@ -201,7 +243,7 @@ impl CombatantState {
         let stage = (self.stages.spd + change).clamp(-6, 6);
         if stage != self.stages.spd {
             self.stages.spd = stage;
-            self.rest_spd_penalty = false;
+            self.flags.remove(CombatantFlags::REST_SPD_PENALTY);
         }
     }
 
@@ -220,12 +262,15 @@ impl CombatantState {
         }
         if mv == &REST {
             self.hp = max_hp;
-            self.rest_atk_penalty |= self.burned;
-            self.rest_spd_penalty |= self.paralyzed;
-            self.burned = false;
+            if self.flags.has_any(CombatantFlags::BURNED) {
+                self.flags.insert(CombatantFlags::REST_ATK_PENALTY);
+            }
+            if self.flags.has_any(CombatantFlags::PARALYZED) {
+                self.flags.insert(CombatantFlags::REST_SPD_PENALTY);
+            }
+            self.flags
+                .remove(CombatantFlags::BURNED | CombatantFlags::PARALYZED | CombatantFlags::POISONED);
             self.frozen = false;
-            self.paralyzed = false;
-            self.poisoned = false;
             self.sleep = Some(Sleep::Resting);
         } else {
             self.heal(max_hp / 2, max_hp);
@@ -262,13 +307,13 @@ impl CombatantState {
 
     pub(crate) fn seed(&mut self, types: &[Type; 2]) {
         if self.can_be_seeded(types) {
-            self.seeded = true;
+            self.flags.insert(CombatantFlags::SEEDED);
         }
     }
 
     pub(crate) fn speed(&self, base_spd: u16) -> u32 {
         let speed = StatStages::apply(base_spd, self.stages.spd);
-        if self.paralyzed || self.rest_spd_penalty {
+        if self.flags.has_any(CombatantFlags::PARALYZED | CombatantFlags::REST_SPD_PENALTY) {
             (speed / 4).max(1)
         } else {
             speed
@@ -277,7 +322,9 @@ impl CombatantState {
 
     pub(crate) fn start_charging(&mut self, slot: usize, mv: &Move) {
         self.charging_slot = Some(slot as u8);
-        self.underground |= mv == &DIG;
+        if mv == &DIG {
+            self.flags.insert(CombatantFlags::UNDERGROUND);
+        }
     }
 
     pub(crate) fn start_rage(&mut self) {
@@ -291,56 +338,39 @@ impl CombatantState {
     }
 
     #[expect(clippy::too_many_arguments, reason = "to be looked at")]
-    #[expect(clippy::fn_params_excessive_bools, reason = "to be looked at")]
     pub(super) const fn from_key(
         hp: u16,
+        flags: CombatantFlags,
         stages: StatStages,
         bide: Option<BideState>,
-        burned: bool,
         charging_slot: Option<u8>,
         confusion_elapsed: Option<u8>,
         disabled: Option<DisableState>,
-        focus_energy: bool,
         frozen: bool,
-        light_screen: bool,
         mist: bool,
-        paralyzed: bool,
-        poisoned: bool,
         rage_accuracy: Option<u8>,
         rampage: Option<RampageState>,
         recharge_slot: Option<u8>,
         reflect: bool,
-        rest_atk_penalty: bool,
-        rest_spd_penalty: bool,
-        seeded: bool,
         sleep: Option<Sleep>,
         trapping: Option<TrappingState>,
-        underground: bool,
     ) -> Self {
         Self {
             hp,
+            flags,
             stages,
             bide,
-            burned,
             charging_slot,
             confusion_elapsed,
             disabled,
-            focus_energy,
             frozen,
-            light_screen,
             mist,
-            paralyzed,
-            poisoned,
             rage_accuracy,
             rampage,
             recharge_slot,
             reflect,
-            rest_atk_penalty,
-            rest_spd_penalty,
-            seeded,
             sleep,
             trapping,
-            underground,
         }
     }
 
@@ -382,35 +412,27 @@ impl CombatantState {
         let dmg_dealt = damage.min(self.hp);
         self.hp -= dmg_dealt;
         self.interrupt_move();
-        self.underground = false;
+        self.flags.remove(CombatantFlags::UNDERGROUND);
         dmg_dealt
     }
 
     pub(super) fn new(hp: u16) -> Self {
         Self {
             hp,
+            flags: CombatantFlags::default(),
             stages: StatStages::default(),
             bide: None,
-            burned: false,
             charging_slot: None,
             confusion_elapsed: None,
             disabled: None,
-            focus_energy: false,
             frozen: false,
-            light_screen: false,
             mist: false,
-            paralyzed: false,
-            poisoned: false,
             rage_accuracy: None,
             rampage: None,
             recharge_slot: None,
             reflect: false,
-            rest_atk_penalty: false,
-            rest_spd_penalty: false,
-            seeded: false,
             sleep: None,
             trapping: None,
-            underground: false,
         }
     }
 }

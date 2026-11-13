@@ -4,7 +4,11 @@ use alloc::{collections::BTreeMap, rc::Rc};
 use core::{array, cell::OnceCell};
 
 use crate::{
-    battle::state::{StatStages, combatant::CombatantState, key::StateMap},
+    battle::state::{
+        StatStages,
+        combatant::{CombatantFlags, CombatantState},
+        key::StateMap,
+    },
     data::{effects::Effect, move_data::Move, moves::STRUGGLE},
     pokemon::{Pokemon, Stats},
 };
@@ -129,7 +133,7 @@ impl<'battle> Combatant<'battle> {
     }
 
     pub(super) fn single_hit_outcomes(&self, target: &Self, state: &CombatantState, target_state: &CombatantState, mv: &Move) -> Vec<(u16, f64)> {
-        let crit_prob = self.crit_probability(mv, state.focus_energy);
+        let crit_prob = self.crit_probability(mv, state.flags.has_any(CombatantFlags::FOCUS_ENERGY));
         let normal = self.damage_rolls(target, state, target_state, mv, false);
         let mut combined: Vec<_> = normal
             .iter()
@@ -166,9 +170,14 @@ impl<'battle> Combatant<'battle> {
             if crit {
                 (u32::from(self.stats.spc), u32::from(target.stats.spc))
             } else {
+                let screen_multiplier = if target_state.flags.has_any(CombatantFlags::LIGHT_SCREEN) {
+                    2
+                } else {
+                    1
+                };
                 (
                     StatStages::apply(self.stats.spc, state.stages.spc),
-                    StatStages::apply(target.stats.spc, target_state.stages.spc) * if target_state.light_screen { 2 } else { 1 },
+                    StatStages::apply(target.stats.spc, target_state.stages.spc) * screen_multiplier,
                 )
             }
         } else if crit {
@@ -248,13 +257,17 @@ impl DamageRollCache {
 
     fn staged(&self, state: &CombatantState, target: &CombatantState, mv: &Move) -> &StagedDamageCache {
         let physical = !mv.mv_type.is_special();
-        let has_screen = if physical { target.reflect } else { target.light_screen };
+        let has_screen = if physical {
+            target.reflect
+        } else {
+            target.flags.has_any(CombatantFlags::LIGHT_SCREEN)
+        };
         let cache = if has_screen {
             self.with_screen.get_or_init(|| Box::new(Self::new()))
         } else {
             self
         };
-        match (physical && state.attack_halved(), state.focus_energy) {
+        match (physical && state.attack_halved(), state.flags.has_any(CombatantFlags::FOCUS_ENERGY)) {
             (false, false) => &cache.normal,
             (true, false) => cache.burned.get_or_init(|| Box::new(StagedDamageCache::new())),
             (false, true) => cache.focused.get_or_init(|| Box::new(StagedDamageCache::new())),

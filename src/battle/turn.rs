@@ -4,7 +4,7 @@ use crate::{
     battle::{
         Combatant, Side,
         combatant::DamageOutcomes,
-        state::{battle::BattleState, key::BattleKey},
+        state::{battle::BattleState, combatant::CombatantFlags, key::BattleKey},
     },
     data::{Type, effects::Effect, move_data::Move},
 };
@@ -119,7 +119,10 @@ impl TurnContext {
             Side::Player => (&mut state.player, &state.ai),
             Side::Ai => (&mut state.ai, &state.player),
         };
-        if target.underground && !mv.effect.targets_user() && !matches!(mv.effect, Effect::Swift | Effect::SwitchAndTeleport) {
+        if target.flags.has_any(CombatantFlags::UNDERGROUND)
+            && !mv.effect.targets_user()
+            && !matches!(mv.effect, Effect::Swift | Effect::SwitchAndTeleport)
+        {
             return 0.0;
         }
         let probability = if matches!(mv.effect, Effect::Rage) {

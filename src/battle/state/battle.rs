@@ -6,7 +6,7 @@ use crate::{
         combatant::Combatant,
         state::{
             BideState,
-            combatant::CombatantState,
+            combatant::{CombatantFlags, CombatantState},
             key::{BattleKey, CombatantKey},
         },
     },
@@ -37,7 +37,7 @@ impl Hash for BattleState {
 
 impl BattleState {
     pub(crate) const fn can_share_damage_rolls(&self, side: Side) -> bool {
-        self.player.bide.is_none() && self.ai.bide.is_none() && !self.combatant(side).seeded
+        self.player.bide.is_none() && self.ai.bide.is_none() && !self.combatant(side).flags.has_any(CombatantFlags::SEEDED)
     }
 
     pub(crate) const fn clear_unused_state(&mut self) {
@@ -129,10 +129,10 @@ impl BattleState {
             Side::Ai => (&mut self.ai, &mut self.player),
         };
         let dmg = CombatantState::residual_damage(max_hp);
-        if combatant.burned || combatant.poisoned {
+        if combatant.flags.has_any(CombatantFlags::BURNED | CombatantFlags::POISONED) {
             combatant.hp = combatant.hp.saturating_sub(dmg);
         }
-        if combatant.seeded {
+        if combatant.flags.has_any(CombatantFlags::SEEDED) {
             combatant.hp = combatant.hp.saturating_sub(dmg);
             opponent.heal(dmg, opponent_max_hp);
         }
@@ -259,15 +259,15 @@ impl BattleState {
         }
         let flags = available_moves
             | (u8::from(self.player.attack_halved()) << 4u8)
-            | (u8::from(self.player.focus_energy) << 5u8)
-            | (u8::from(self.ai.seeded) << 6u8)
+            | (u8::from(self.player.flags.has_any(CombatantFlags::FOCUS_ENERGY)) << 5u8)
+            | (u8::from(self.ai.flags.has_any(CombatantFlags::SEEDED)) << 6u8)
             | (u8::from(self.ai.has_status_condition()) << 7u8);
         let [hp_low, hp_high] = self.ai.hp.to_le_bytes();
         let acc_and_eva = (self.player.stages.acc as u8 & 15) | ((self.ai.stages.eva as u8) << 4u8);
         let def_and_flags = (self.ai.stages.def as u8 & 15)
             | (u8::from(self.ai.reflect) << 4u8)
             | (u8::from(has_ohko_speed) << 5u8)
-            | (u8::from(self.ai.light_screen) << 6u8);
+            | (u8::from(self.ai.flags.has_any(CombatantFlags::LIGHT_SCREEN)) << 6u8);
         u64::from_le_bytes([
             hp_low,
             hp_high,

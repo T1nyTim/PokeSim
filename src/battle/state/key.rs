@@ -4,7 +4,11 @@ use std::collections::HashMap;
 use crate::{
     battle::{
         Side,
-        state::{BideState, DisableState, RampageState, Sleep, StatStages, TrappingState, battle::BattleState, combatant::CombatantState},
+        state::{
+            BideState, DisableState, RampageState, Sleep, StatStages, TrappingState,
+            battle::BattleState,
+            combatant::{CombatantFlags, CombatantState},
+        },
     },
     data::move_data::Move,
 };
@@ -159,23 +163,14 @@ impl CombatantKey {
 
     pub(super) fn new(combatant: &CombatantState) -> Self {
         let [hp_low, hp_high] = combatant.hp.to_le_bytes();
-        let flags = u8::from(combatant.poisoned)
-            | (u8::from(combatant.seeded) << 1u8)
-            | (u8::from(combatant.bide.is_some()) << 2u8)
-            | (u8::from(combatant.burned) << 3u8)
-            | (u8::from(combatant.trapping.is_some()) << 4u8)
-            | (u8::from(combatant.paralyzed) << 5u8)
-            | (u8::from(combatant.focus_energy) << 6u8)
-            | (u8::from(combatant.underground) << 7u8);
+        let [flags, spd_flags] = combatant.flags.key_bytes();
+        let packed_flags = flags | (u8::from(combatant.bide.is_some()) << 2) | (u8::from(combatant.trapping.is_some()) << 4);
         let disabled = combatant.disabled.as_ref();
         let bide = combatant.bide.as_ref();
         let locked_move_data = bide.map_or_else(|| combatant.rampage.as_ref().map_or(0, RampageState::key), |active| active.damage);
         let trapping = combatant.trapping.as_ref();
         let acc_and_eva = (combatant.stages.acc as u8 & 15) | ((combatant.stages.eva as u8) << 4u8);
-        let spd_and_flags = (combatant.stages.spd as u8 & 15)
-            | (u8::from(combatant.rest_atk_penalty) << 4u8)
-            | (u8::from(combatant.rest_spd_penalty) << 5u8)
-            | (u8::from(combatant.light_screen) << 6u8);
+        let spd_and_flags = (combatant.stages.spd as u8 & 15) | spd_flags;
         let sleep = if combatant.frozen {
             Self::FROZEN
         } else {
@@ -207,7 +202,7 @@ impl CombatantKey {
                 spd_and_flags,
                 combatant.stages.spc as u8,
                 acc_and_eva,
-                flags,
+                packed_flags,
             ]),
             status,
             trapping_mv: trapping.map(|active| active.mv),
@@ -244,6 +239,7 @@ impl CombatantKey {
         let is_biding = flags & 4 != 0;
         CombatantState::from_key(
             hp,
+            CombatantFlags::from_key(flags, spd_and_flags),
             StatStages::new(
                 atk.cast_signed(),
                 def.cast_signed(),
@@ -253,23 +249,15 @@ impl CombatantKey {
                 acc_and_eva.cast_signed() >> 4u8,
             ),
             is_biding.then_some(BideState::from_key(((self.status >> 14) & 3) as u8, locked_move_data)),
-            flags & 8 != 0,
             (((self.status >> 52) & 7) as u8).checked_sub(1),
             (confusion != 7).then_some(confusion),
             (disabled_slot != 7).then_some(DisableState::from_key(disabled_slot, ((self.status >> 10) & 15) as u8)),
-            flags & 64 != 0,
             sleep_code == Self::FROZEN,
-            spd_and_flags & 0x40 != 0,
             mist,
-            flags & 32 != 0,
-            flags & 1 != 0,
             (rage_acc != 0).then_some(rage_acc),
             (!is_biding && locked_move_data != 0).then_some(RampageState::from_key(locked_move_data)),
             recharge_slot,
             self.status >> 63u64 != 0,
-            spd_and_flags & 0x10 != 0,
-            spd_and_flags & 0x20 != 0,
-            flags & 2 != 0,
             sleep,
             self.trapping_mv.map(|mv| {
                 TrappingState::from_key(
@@ -279,7 +267,6 @@ impl CombatantKey {
                     self.status & (1 << 51u64) != 0,
                 )
             }),
-            flags & 128 != 0,
         )
     }
 }

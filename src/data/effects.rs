@@ -1,7 +1,10 @@
 use core::array;
 
 use crate::{
-    battle::state::{BideState, DisableState, combatant::CombatantState},
+    battle::state::{
+        BideState, DisableState,
+        combatant::{CombatantFlags, CombatantState},
+    },
     data::Type,
 };
 
@@ -237,9 +240,9 @@ impl Effect {
         match self {
             Self::AccuracyDown | Self::AttackDown | Self::DefenseDown1 | Self::DefenseDown2 | Self::SpeedDown if target.mist => {}
             Self::Confusion => target.confuse(),
-            Self::FocusEnergy => target.focus_energy = true,
+            Self::FocusEnergy => target.flags.insert(CombatantFlags::FOCUS_ENERGY),
             Self::LeechSeed => target.seed(target_types),
-            Self::LightScreen => target.light_screen = true,
+            Self::LightScreen => target.flags.insert(CombatantFlags::LIGHT_SCREEN),
             Self::Mist => target.mist = true,
             Self::Paralyze => {
                 if target.can_be_paralyzed() {
