@@ -1,10 +1,7 @@
 use core::array;
 
 use crate::{
-    battle::state::{
-        BideState, DisableState,
-        combatant::{CombatantFlags, CombatantState},
-    },
+    battle::state::{BideState, CombatantFlags, CombatantState, DisableState},
     data::Type,
 };
 

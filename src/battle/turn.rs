@@ -2,12 +2,17 @@ use core::{array, cmp::Ordering};
 
 use crate::{
     battle::{
-        Combatant, Side,
-        combatant::DamageOutcomes,
-        state::{battle::BattleState, combatant::CombatantFlags, key::BattleKey},
+        Combatant, DamageOutcomes,
+        state::{BattleKey, BattleState, CombatantFlags},
     },
-    data::{Type, effects::Effect, move_data::Move},
+    data::{Effect, Move, Type},
 };
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub enum Side {
+    Ai,
+    Player,
+}
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub(super) enum TurnAction {

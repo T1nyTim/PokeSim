@@ -4,12 +4,8 @@ use alloc::{collections::BTreeMap, rc::Rc};
 use core::{array, cell::OnceCell};
 
 use crate::{
-    battle::state::{
-        StatStages,
-        combatant::{CombatantFlags, CombatantState},
-        key::StateMap,
-    },
-    data::{effects::Effect, move_data::Move, moves::STRUGGLE},
+    battle::state::{CombatantFlags, CombatantState, StatStages, StateMap},
+    data::{Effect, Move, STRUGGLE},
     pokemon::{Pokemon, Stats},
 };
 

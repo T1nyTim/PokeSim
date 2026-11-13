@@ -2,15 +2,10 @@ use core::hash::{Hash, Hasher};
 
 use crate::{
     battle::{
-        Side,
-        combatant::Combatant,
-        state::{
-            BideState,
-            combatant::{CombatantFlags, CombatantState},
-            key::{BattleKey, CombatantKey},
-        },
+        Combatant, Side,
+        state::{BattleKey, BideState, CombatantFlags, CombatantKey, CombatantState},
     },
-    data::{Type, effects::Effect, move_data::Move, moves::BIDE},
+    data::{BIDE, Effect, Move, Type},
     journey::TrainerItem,
 };
 

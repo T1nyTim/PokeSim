@@ -1,8 +1,8 @@
 #![cfg_attr(rustfmt, rustfmt::skip)]
 use std::sync::LazyLock;
 
-use crate::{
-    data::{moves::{BIDE, BUBBLEBEAM, MEGA_DRAIN, THUNDERBOLT}, species::*}, pokemon::{Dvs, Pokemon},
+use crate::{ 
+    data::{BIDE, BUBBLEBEAM, MEGA_DRAIN, THUNDERBOLT, species_data::*}, pokemon::{Dvs, Pokemon},
 };
  
 pub static ABRA_TRAINER_L15: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&ABRA, Dvs::TRAINER, 15));
@@ -37,6 +37,7 @@ pub static CLEFAIRY_TRAINER_L14: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::f
 pub static CLEFAIRY_TRAINER_L20: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&CLEFAIRY, Dvs::TRAINER, 20));
 pub static CLEFAIRY_TRAINER_L22: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&CLEFAIRY, Dvs::TRAINER, 22));
 pub static CLEFAIRY_TRAINER_L29: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&CLEFAIRY, Dvs::TRAINER, 29));
+pub static CLEFAIRY_TRAINER_L33: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&CLEFAIRY, Dvs::TRAINER, 33));
 pub static CUBONE_TRAINER_L20: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&CUBONE, Dvs::TRAINER, 20));
 pub static CUBONE_TRAINER_L22: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&CUBONE, Dvs::TRAINER, 22));
 pub static CUBONE_TRAINER_L23: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&CUBONE, Dvs::TRAINER, 23));
@@ -105,6 +106,9 @@ pub static GRIMER_TRAINER_L12: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::fro
 pub static GRIMER_TRAINER_L17: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GRIMER, Dvs::TRAINER, 17));
 pub static GRIMER_TRAINER_L20: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GRIMER, Dvs::TRAINER, 20));
 pub static GRIMER_TRAINER_L22: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GRIMER, Dvs::TRAINER, 22));
+pub static GRIMER_TRAINER_L26: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GRIMER, Dvs::TRAINER, 26));
+pub static GRIMER_TRAINER_L28: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GRIMER, Dvs::TRAINER, 28));
+pub static GRIMER_TRAINER_L29: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GRIMER, Dvs::TRAINER, 29));
 pub static GROWLITHE_TRAINER_L17: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GROWLITHE, Dvs::TRAINER, 17));
 pub static GROWLITHE_TRAINER_L18: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GROWLITHE, Dvs::TRAINER, 18));
 pub static GROWLITHE_TRAINER_L21: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&GROWLITHE, Dvs::TRAINER, 21));
@@ -276,6 +280,7 @@ pub static SPEAROW_TRAINER_L16: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::fr
 pub static SPEAROW_TRAINER_L25: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&SPEAROW, Dvs::TRAINER, 25));
 pub static SPEAROW_TRAINER_L26: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&SPEAROW, Dvs::TRAINER, 26));
 pub static SPEAROW_TRAINER_L28: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&SPEAROW, Dvs::TRAINER, 28));
+pub static SPEAROW_TRAINER_L29: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&SPEAROW, Dvs::TRAINER, 29));
 pub static SQUIRTLE_TRAINER_L20: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&SQUIRTLE, Dvs::TRAINER, 20));
 pub static STARMIE_MISTY_L21: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&STARMIE, Dvs::TRAINER, 21).with_move(&BUBBLEBEAM));
 pub static STARYU_TRAINER_L17: LazyLock<Pokemon> = LazyLock::new(|| Pokemon::from_species(&STARYU, Dvs::TRAINER, 17));

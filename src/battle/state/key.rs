@@ -4,13 +4,9 @@ use std::collections::HashMap;
 use crate::{
     battle::{
         Side,
-        state::{
-            BideState, DisableState, RampageState, Sleep, StatStages, TrappingState,
-            battle::BattleState,
-            combatant::{CombatantFlags, CombatantState},
-        },
+        state::{BattleState, BideState, CombatantFlags, CombatantState, DisableState, RampageState, Sleep, StatStages, TrappingState},
     },
-    data::move_data::Move,
+    data::Move,
 };
 
 pub type StateMap<K, V = f64> = HashMap<K, V, BuildHasherDefault<StateHasher>>;
@@ -164,7 +160,7 @@ impl CombatantKey {
     pub(super) fn new(combatant: &CombatantState) -> Self {
         let [hp_low, hp_high] = combatant.hp.to_le_bytes();
         let [flags, spd_flags] = combatant.flags.key_bytes();
-        let packed_flags = flags | (u8::from(combatant.bide.is_some()) << 2) | (u8::from(combatant.trapping.is_some()) << 4);
+        let packed_flags = flags | (u8::from(combatant.bide.is_some()) << 2u8) | (u8::from(combatant.trapping.is_some()) << 4u8);
         let disabled = combatant.disabled.as_ref();
         let bide = combatant.bide.as_ref();
         let locked_move_data = bide.map_or_else(|| combatant.rampage.as_ref().map_or(0, RampageState::key), |active| active.damage);

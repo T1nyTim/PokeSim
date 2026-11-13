@@ -1,5 +1,5 @@
 #![cfg_attr(rustfmt, rustfmt::skip)]
-use crate::data::{BaseStats, Evolve, GrowthRate, Item, Species, SpeciesKind, Type, moves::*};
+use crate::data::{BaseStats, Evolve, GrowthRate, Item, Species, SpeciesKind, Type, move_data::*};
 
 pub const ABRA: Species = Species::new(
     SpeciesKind::Abra, BaseStats::new(25, 20, 15, 90, 105), [Type::Psychic, Type::Psychic], 73,

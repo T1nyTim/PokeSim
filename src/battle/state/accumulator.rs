@@ -1,6 +1,6 @@
 use core::{hash::BuildHasher as _, mem::take};
 
-use crate::battle::state::key::{BattleKey, StateMap};
+use crate::battle::state::{BattleKey, StateMap};
 
 #[derive(Default)]
 pub struct StateAccumulator {

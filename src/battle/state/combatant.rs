@@ -1,15 +1,10 @@
 use crate::{
     battle::state::{BideState, DisableState, RampageState, Sleep, StatStages, TrappingState},
-    data::{
-        Type,
-        effects::Effect,
-        move_data::Move,
-        moves::{DIG, RAGE, REST},
-    },
+    data::{DIG, Effect, Move, RAGE, REST, Type},
 };
 
 #[derive(Clone, Default, Eq, PartialEq)]
-pub(crate) struct CombatantFlags(u16);
+pub struct CombatantFlags(u16);
 
 impl CombatantFlags {
     pub(crate) const FOCUS_ENERGY: u16 = 1 << 6;

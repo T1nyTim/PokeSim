@@ -1,7 +1,7 @@
 use core::array;
 
 use crate::{
-    data::{Item, Type, effects::Effect, move_data::Move, moves::STRUGGLE},
+    data::{Effect, Item, Move, STRUGGLE, Type},
     pokemon::Pokemon,
 };
 
